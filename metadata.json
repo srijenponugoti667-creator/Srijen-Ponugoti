@@ -1,0 +1,8 @@
+{
+  "name": "JusticeBridge",
+  "description": "Bridging lawyers. Empowering clients. Reducing delays. Legal directory, secure isolated case management, and membership workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

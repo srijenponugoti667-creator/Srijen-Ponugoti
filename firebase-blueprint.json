@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "Registered clients, advocates, and administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "lawyer", "admin"] },
+        "phone": { "type": "string" },
+        "isVerifiedLawyer": { "type": "boolean" },
+        "barCouncilNumber": { "type": "string" },
+        "stateBarCouncil": { "type": "string" },
+        "membershipActive": { "type": "boolean" },
+        "membershipPlan": { "type": "string" },
+        "membershipExpiresAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "cases": {
+      "title": "Cases",
+      "description": "Legal court cases and matter dockets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "caseNumber": { "type": "string" },
+        "cnrNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "caseType": { "type": "string" },
+        "courtName": { "type": "string" },
+        "petitioner": { "type": "string" },
+        "respondent": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "assignedLawyerId": { "type": "string" },
+        "assignedLawyerName": { "type": "string" },
+        "status": { "type": "string" },
+        "delayRiskScore": { "type": "string" },
+        "delayDays": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "clientId", "status"]
+    },
+    "consultations": {
+      "title": "Consultations",
+      "description": "Advocate booking requests and consultation appointments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "lawyerId": { "type": "string" },
+        "lawyerName": { "type": "string" },
+        "bookingDate": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "consultationType": { "type": "string" },
+        "matterSubject": { "type": "string" },
+        "status": { "type": "string" },
+        "fee": { "type": "number" },
+        "meetingLink": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "clientId", "lawyerId", "fee", "status"]
+    },
+    "documents": {
+      "title": "Documents",
+      "description": "Generated or uploaded legal documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "docType": { "type": "string" },
+        "caseId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "docType"]
+    },
+    "payments": {
+      "title": "Payments",
+      "description": "Payment invoices and transaction records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "planName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paidAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "amount", "status"]
+    }
+  }
+}

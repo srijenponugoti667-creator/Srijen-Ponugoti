@@ -126,6 +126,32 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              id="nav-btn-legal-docs"
+              onClick={() => setActiveTab('legal_docs')}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'legal_docs'
+                  ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-emerald-400" />
+              <span>Legal Docs</span>
+            </button>
+
+            <button
+              id="nav-btn-ai-assistant"
+              onClick={() => setActiveTab('ai_assistant')}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'ai_assistant'
+                  ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
+              }`}
+            >
+              <Scale className="w-4 h-4 text-amber-400" />
+              <span>AI Counsel</span>
+            </button>
+
+            <button
               id="nav-btn-consultations"
               onClick={onOpenConsultationsModal}
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-zinc-900/60 transition-all"

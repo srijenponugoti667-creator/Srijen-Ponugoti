@@ -14,6 +14,8 @@ import { FileNewCaseModal } from './components/FileNewCaseModal';
 import { AuthModal } from './components/AuthModal';
 import { ConsultationsManagerModal } from './components/ConsultationsManagerModal';
 import { LawyerProfileEditorModal } from './components/LawyerProfileEditorModal';
+import { LegalDocumentGenerator } from './components/LegalDocumentGenerator';
+import { AILegalAssistant } from './components/AILegalAssistant';
 import { User, LawyerProfile, CaseMatter, PaymentInvoice } from './types';
 import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -289,6 +291,10 @@ export default function App() {
         )}
 
         {activeTab === 'analytics' && <DelayReductionAnalytics />}
+
+        {activeTab === 'legal_docs' && <LegalDocumentGenerator />}
+
+        {activeTab === 'ai_assistant' && <AILegalAssistant />}
 
         {activeTab === 'membership' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

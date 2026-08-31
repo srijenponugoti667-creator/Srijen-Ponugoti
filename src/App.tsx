@@ -16,8 +16,12 @@ import { ConsultationsManagerModal } from './components/ConsultationsManagerModa
 import { LawyerProfileEditorModal } from './components/LawyerProfileEditorModal';
 import { LegalDocumentGenerator } from './components/LegalDocumentGenerator';
 import { AILegalAssistant } from './components/AILegalAssistant';
+import { AdvocateGrading } from './components/AdvocateGrading';
+import { VoiceCaseFilerModal } from './components/VoiceCaseFilerModal';
+import { Footer } from './components/Footer';
 import { User, LawyerProfile, CaseMatter, PaymentInvoice } from './types';
 import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { getTranslation } from './languages';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User>({
@@ -36,6 +40,7 @@ export default function App() {
 
   // Modals state
   const [selectedCaseForFiles, setSelectedCaseForFiles] = useState<string | null>(null);
+  const [selectedGradingLawyerId, setSelectedGradingLawyerId] = useState<string | undefined>(undefined);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState<boolean>(false);
   const [selectedLawyerForBooking, setSelectedLawyerForBooking] = useState<LawyerProfile | null>(null);
@@ -43,6 +48,18 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isConsultationsModalOpen, setIsConsultationsModalOpen] = useState<boolean>(false);
   const [isProfileEditorModalOpen, setIsProfileEditorModalOpen] = useState<boolean>(false);
+  const [isVoiceFilerModalOpen, setIsVoiceFilerModalOpen] = useState<boolean>(false);
+  const [currentLanguage, setCurrentLanguage] = useState<string>(() => {
+    return localStorage.getItem('preferred_lang') || 'te';
+  });
+
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
+
+  const handleLanguageChange = (lang: string) => {
+    setCurrentLanguage(lang);
+    localStorage.setItem('preferred_lang', lang);
+    showToast(`Language switched to ${lang.toUpperCase()}`);
+  };
 
   // Toast / Status notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -123,12 +140,16 @@ export default function App() {
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onOpenConsultationsModal={() => setIsConsultationsModalOpen(true)}
         onOpenProfileEditorModal={() => setIsProfileEditorModalOpen(true)}
+        onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
+        currentLanguage={currentLanguage}
+        onLanguageChange={handleLanguageChange}
       />
 
       {/* 2. Membership Notification Banner (Rules: Client ₹2,999/yr, Advocate ₹3,999/mo) */}
       <MembershipNotificationBanner
         currentUser={currentUser}
         onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+        currentLanguage={currentLanguage}
       />
 
       {/* Toast Alert */}
@@ -149,6 +170,9 @@ export default function App() {
               onFindCaseClick={() => setActiveTab('find_case')}
               onMyCasesClick={() => setActiveTab('my_cases')}
               onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+              onOpenVoiceCaseFilerClick={() => setIsVoiceFilerModalOpen(true)}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
             />
 
             {/* Quick Preview Sections on Home */}
@@ -164,22 +188,22 @@ export default function App() {
                       <Scale className="w-6 h-6" />
                     </div>
                     <span className="text-xs uppercase font-extrabold tracking-wider text-red-400 block mb-1">
-                      Advocate Directory
+                      {t('advocateDirectory')}
                     </span>
                     <h3 className="text-2xl font-bold text-white font-cinzel mb-2">
-                      Connect with Verified High Court & Supreme Court Counsels
+                      {t('connectVerifiedCounsels')}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
-                      Filter verified senior advocates across commercial litigation, civil disputes, constitutional writs, and cyber law. Check active Bar Council enrollment and book consultations directly.
+                      {t('filterAdvocatesDesc')}
                     </p>
                   </div>
 
                   <button
                     id="btn-home-preview-find-lawyer"
                     onClick={() => setActiveTab('lawyers')}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-red-950/70 hover:bg-red-900/90 text-red-200 border border-red-800 text-xs sm:text-sm font-bold shadow-md transition-all"
+                    className="flex items-center justify-between p-4 rounded-2xl bg-red-950/70 hover:bg-red-900/90 text-red-200 border border-red-800 text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer"
                   >
-                    <span>Browse 1,420+ Verified Advocates</span>
+                    <span>{t('browseAdvocatesBtn')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -191,22 +215,22 @@ export default function App() {
                       <FileText className="w-6 h-6" />
                     </div>
                     <span className="text-xs uppercase font-extrabold tracking-wider text-red-400 block mb-1">
-                      Case Tracking & Delay Monitor
+                      {t('caseTrackingDelayMonitor')}
                     </span>
                     <h3 className="text-2xl font-bold text-white font-cinzel mb-2">
-                      Track Litigations, CNR Numbers & Delay Risk Scores
+                      {t('trackLitigationsTitle')}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
-                      Instant docket search across High Courts and specialized tribunals. Monitor stage transitions from initial e-filing to notice, evidence cross-examinations, and final judgments.
+                      {t('trackLitigationsDesc')}
                     </p>
                   </div>
 
                   <button
                     id="btn-home-preview-find-case"
                     onClick={() => setActiveTab('find_case')}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-zinc-900 hover:bg-zinc-850 text-slate-200 border border-zinc-750 text-xs sm:text-sm font-bold shadow-md transition-all"
+                    className="flex items-center justify-between p-4 rounded-2xl bg-zinc-900 hover:bg-zinc-850 text-slate-200 border border-zinc-750 text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer"
                   >
-                    <span>Search Case Matters by CNR</span>
+                    <span>{t('searchCaseByCnrBtn')}</span>
                     <ArrowRight className="w-4 h-4 text-red-400" />
                   </button>
                 </div>
@@ -218,10 +242,10 @@ export default function App() {
                 <div className="text-center max-w-2xl mx-auto mb-8">
                   <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-xs font-semibold mb-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
-                    <span>Judicial Data Security & Compliance</span>
+                    <span>{t('judicialDataSecurity')}</span>
                   </div>
                   <h3 className="text-2xl font-bold text-white font-cinzel">
-                    Engineered for Strict Legal Confidentiality
+                    {t('engineeredForConfidentiality')}
                   </h3>
                 </div>
 
@@ -234,10 +258,10 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="text-base font-bold text-white mb-1">
-                        Rule 1: Only Verified Lawyers Can View Case Files
+                        {t('securityRule1Title')}
                       </h4>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Unverified lawyers or external viewers receive a strict 403 Forbidden rejection when attempting to access confidential case discovery, evidence affidavits, or client work-product.
+                        {t('securityRule1Desc')}
                       </p>
                     </div>
                   </div>
@@ -249,10 +273,10 @@ export default function App() {
                     </div>
                     <div>
                       <h4 className="text-base font-bold text-white mb-1">
-                        Rule 2: Complete Client Isolation
+                        {t('securityRule2Title')}
                       </h4>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Multi-tenant partition strictly prevents cross-client visibility. Rohan Verma cannot view or query Priya Nair’s property dispute, guaranteeing absolute litigation privacy.
+                        {t('securityRule2Desc')}
                       </p>
                     </div>
                   </div>
@@ -269,6 +293,20 @@ export default function App() {
             currentUser={currentUser}
             onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
             onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+            currentLanguage={currentLanguage}
+            onNavigateToGrading={(lawyerId) => {
+              setSelectedGradingLawyerId(lawyerId);
+              setActiveTab('grading');
+            }}
+          />
+        )}
+
+        {activeTab === 'grading' && (
+          <AdvocateGrading
+            currentUser={currentUser}
+            onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
+            currentLanguage={currentLanguage}
+            initialSelectedLawyerId={selectedGradingLawyerId}
           />
         )}
 
@@ -277,6 +315,7 @@ export default function App() {
             currentUser={currentUser}
             onSelectCase={(caseId) => setSelectedCaseForFiles(caseId)}
             onFileNewCaseClick={() => setIsFileCaseModalOpen(true)}
+            currentLanguage={currentLanguage}
           />
         )}
 
@@ -287,14 +326,23 @@ export default function App() {
             onFileNewCase={() => setIsFileCaseModalOpen(true)}
             onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
             onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+            onOpenVoiceCaseFiler={() => setIsVoiceFilerModalOpen(true)}
+            currentLanguage={currentLanguage}
           />
         )}
 
-        {activeTab === 'analytics' && <DelayReductionAnalytics />}
+        {activeTab === 'analytics' && <DelayReductionAnalytics currentLanguage={currentLanguage} />}
 
-        {activeTab === 'legal_docs' && <LegalDocumentGenerator />}
+        {activeTab === 'legal_docs' && <LegalDocumentGenerator currentLanguage={currentLanguage} />}
 
-        {activeTab === 'ai_assistant' && <AILegalAssistant />}
+        {activeTab === 'ai_assistant' && (
+          <AILegalAssistant
+            onOpenFileCaseModal={() => setIsFileCaseModalOpen(true)}
+            onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
+            currentLanguage={currentLanguage}
+            onLanguageChange={handleLanguageChange}
+          />
+        )}
 
         {activeTab === 'membership' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -481,6 +529,15 @@ export default function App() {
         onCaseFiled={handleCaseFiled}
       />
 
+      {/* 5b. Voice Case Filer Modal (For Illiterate & Multilingual Citizens) */}
+      <VoiceCaseFilerModal
+        currentUser={currentUser}
+        isOpen={isVoiceFilerModalOpen}
+        onClose={() => setIsVoiceFilerModalOpen(false)}
+        onCaseFiled={handleCaseFiled}
+        initialLanguage={currentLanguage}
+      />
+
       {/* 6. Account Registration & Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -513,36 +570,8 @@ export default function App() {
         }}
       />
 
-      {/* Footer */}
-      <footer className="border-t border-zinc-850 bg-zinc-950 py-12 text-slate-400 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-zinc-800">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-red-950/80 border border-red-800 flex items-center justify-center text-red-300">
-                <Scale className="w-4 h-4" />
-              </div>
-              <span className="text-lg font-bold text-white font-cinzel">
-                Justice<span className="text-red-500">Bridge</span>
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-400 text-center md:text-right">
-              Bridging lawyers &bull; Empowering clients &bull; Reducing delays
-            </p>
-          </div>
-
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
-            <p>&copy; 2026 JusticeBridge Legal Technologies Ltd. All rights reserved.</p>
-            <div className="flex items-center space-x-4">
-              <span>Rule 1 Verified Advocate Vault</span>
-              <span>&bull;</span>
-              <span>Rule 2 Isolated Multi-Tenancy</span>
-              <span>&bull;</span>
-              <span>Bar Council of India Verified</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer with Terms, Privacy, Refund, and Contact Modals */}
+      <Footer currentLanguage={currentLanguage} />
 
     </div>
   );

@@ -26,14 +26,92 @@ export const BookConsultationModal: React.FC<BookConsultationModalProps> = ({
 
   const timeSlots = ['10:00 AM', '11:00 AM', '02:30 PM', '04:00 PM', '05:30 PM'];
 
-  const handleBook = (e: React.FormEvent) => {
+  const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
     setBooking(true);
-    setTimeout(() => {
+
+    if ((window as any).Razorpay && lawyer.consultationFee > 0) {
+      const options = {
+        key: 'rzp_test_TVt4WNqDvr1XOk',
+        amount: lawyer.consultationFee * 100,
+        currency: 'INR',
+        name: 'JusticeBridge Judicial Portal',
+        description: `Advocate Consultation Retainer: ${lawyer.name}`,
+        image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=128&auto=format&fit=crop&q=80',
+        prefill: {
+          name: currentUser.name,
+          email: currentUser.email,
+          contact: currentUser.phone ? currentUser.phone.replace(/[^0-9]/g, '').slice(-10) : undefined,
+        },
+        notes: {
+          lawyerId: lawyer.id,
+          lawyerName: lawyer.name,
+          matterTitle,
+          slot: `${selectedDate} ${selectedTime}`
+        },
+        theme: {
+          color: '#7f1d1d',
+        },
+        handler: async function (response: any) {
+          try {
+            await fetch('/api/consultations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lawyerId: lawyer.id,
+                lawyerName: lawyer.name,
+                bookingDate: selectedDate,
+                timeSlot: selectedTime,
+                consultationType: 'Video Call',
+                matterSubject: matterTitle,
+                notes: `${notes} (Paid via Razorpay Ref: ${response.razorpay_payment_id})`,
+                fee: lawyer.consultationFee
+              }),
+            });
+          } catch (cErr) {
+            console.error('Consultation booking error:', cErr);
+          }
+          setBooking(false);
+          setBooked(true);
+          onSuccess();
+        },
+        modal: {
+          ondismiss: function () {
+            setBooking(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        alert(`Payment failed: ${resp.error.description || 'Transaction canceled'}`);
+        setBooking(false);
+      });
+      rzp.open();
+    } else {
+      // Fallback
+      try {
+        await fetch('/api/consultations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lawyerId: lawyer.id,
+            lawyerName: lawyer.name,
+            bookingDate: selectedDate,
+            timeSlot: selectedTime,
+            consultationType: 'Video Call',
+            matterSubject: matterTitle,
+            notes,
+            fee: lawyer.consultationFee
+          }),
+        });
+      } catch (cErr) {
+        console.error('Consultation booking error:', cErr);
+      }
       setBooking(false);
       setBooked(true);
       onSuccess();
-    }, 900);
+    }
   };
 
   return (

@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, TrendingDown, ShieldCheck, Zap, BarChart3, ArrowDownRight, Scale, CheckCircle2, AlertTriangle, Sparkles, FileSpreadsheet } from 'lucide-react';
 import { DelayMetric } from '../types';
+import { getTranslation } from '../languages';
 
-export const DelayReductionAnalytics: React.FC = () => {
+interface DelayReductionAnalyticsProps {
+  currentLanguage?: string;
+}
+
+export const DelayReductionAnalytics: React.FC<DelayReductionAnalyticsProps> = ({ currentLanguage = 'en' }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [metrics, setMetrics] = useState<DelayMetric[]>([]);
   const [stats, setStats] = useState({
-    totalCasesRegistered: 18450,
-    verifiedAdvocatesCount: 1420,
-    averageDelayReductionDays: 84,
-    disposalRateImprovementPercent: 68.4,
-    activeHearingsTracked: 3290
+    totalCasesRegistered: 0,
+    verifiedAdvocatesCount: 0,
+    averageDelayReductionDays: 0,
+    disposalRateImprovementPercent: 0,
+    activeHearingsTracked: 0
   });
 
   // Delay simulation calculator
@@ -47,49 +53,54 @@ export const DelayReductionAnalytics: React.FC = () => {
       <div className="mb-10 text-center max-w-3xl mx-auto">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-xs font-semibold mb-3">
           <Clock className="w-3.5 h-3.5 text-red-400" />
-          <span>Judicial Acceleration Intelligence</span>
+          <span>{t('delayAnalyticsBadge')}</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-cinzel">
-          Reducing Delays Across Indian Courts
+          {t('delayAnalyticsTitle')}
         </h2>
         <p className="text-slate-300 text-sm sm:text-base mt-2">
-          Through electronic discovery management, automated cause-list synchronizations, and strict adjournment prevention protocols, JusticeBridge eliminates court backlogs.
+          {t('delayAnalyticsSubtitle')}
+        </p>
+        <p className="text-[11px] text-slate-500 mt-1 italic">
+          {t('delayDisclaimer')}
         </p>
       </div>
 
       {/* Top Stat Counters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
         <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl">
-          <span className="text-xs text-slate-400 font-semibold block mb-1">Average Delay Saved</span>
+          <span className="text-xs text-slate-400 font-semibold block mb-1">{t('targetDelayReduction')}</span>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl sm:text-4xl font-extrabold text-red-400 font-cinzel">84</span>
-            <span className="text-xs text-red-300 font-bold">Days / Matter</span>
+            <span className="text-3xl sm:text-4xl font-extrabold text-red-400 font-cinzel">~65%</span>
+            <span className="text-xs text-red-300 font-bold">Timeline Compression</span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">Compared to traditional cause-list wait</span>
+          <span className="text-[11px] text-slate-500 mt-2 block">Via e-Discovery & Notice sync</span>
         </div>
 
         <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl">
-          <span className="text-xs text-slate-400 font-semibold block mb-1">Disposal Speed Improvement</span>
+          <span className="text-xs text-slate-400 font-semibold block mb-1">{t('hearingTrackingSpeed')}</span>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 font-cinzel">+68.4%</span>
+            <span className="text-3xl sm:text-4xl font-extrabold text-emerald-400 font-cinzel">Real-Time</span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">Faster than national tribunal median</span>
+          <span className="text-[11px] text-slate-500 mt-2 block">Live cause-list docket polling</span>
         </div>
 
         <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl">
-          <span className="text-xs text-slate-400 font-semibold block mb-1">Verified Bar Advocates</span>
+          <span className="text-xs text-slate-400 font-semibold block mb-1">{t('verifiedAdvocatesStat')}</span>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl sm:text-4xl font-extrabold text-amber-400 font-cinzel">1,420+</span>
+            <span className="text-3xl sm:text-4xl font-extrabold text-amber-400 font-cinzel">{stats.verifiedAdvocatesCount}</span>
+            <span className="text-xs text-amber-300 font-bold">Onboarded</span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">High Court & Supreme Court counsels</span>
+          <span className="text-[11px] text-slate-500 mt-2 block">BCI authenticated counsels</span>
         </div>
 
         <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl">
-          <span className="text-xs text-slate-400 font-semibold block mb-1">Litigation Matters Tracked</span>
+          <span className="text-xs text-slate-400 font-semibold block mb-1">{t('litigationMattersActive')}</span>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl sm:text-4xl font-extrabold text-white font-cinzel">18,450+</span>
+            <span className="text-3xl sm:text-4xl font-extrabold text-white font-cinzel">{stats.totalCasesRegistered}</span>
+            <span className="text-xs text-slate-300 font-bold">Matters</span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-2 block">With active hearing telemetry</span>
+          <span className="text-[11px] text-slate-500 mt-2 block">Real active docket tracking</span>
         </div>
       </div>
 
@@ -99,10 +110,10 @@ export const DelayReductionAnalytics: React.FC = () => {
         {/* Category Timelines */}
         <div className="lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-zinc-900/90 border border-zinc-800 shadow-2xl">
           <h3 className="text-xl font-bold text-white font-cinzel mb-2">
-            Disposal Timelines: Traditional vs JusticeBridge
+            {t('disposalTimelinesTitle')}
           </h3>
           <p className="text-xs text-slate-400 mb-6">
-            Empirical disposal benchmarks recorded across High Courts and specialized tribunals.
+            {t('disposalTimelinesDesc')}
           </p>
 
           <div className="space-y-6">
@@ -121,7 +132,7 @@ export const DelayReductionAnalytics: React.FC = () => {
                 <div className="space-y-1.5">
                   {/* Traditional */}
                   <div className="flex items-center space-x-3 text-xs">
-                    <span className="w-24 text-slate-500 text-[11px]">Traditional:</span>
+                    <span className="w-24 text-slate-500 text-[11px]">{t('traditional')}:</span>
                     <div className="flex-1 bg-zinc-950 rounded-full h-3 overflow-hidden border border-zinc-800">
                       <div className="bg-zinc-600 h-full rounded-full w-[90%]"></div>
                     </div>
@@ -150,18 +161,18 @@ export const DelayReductionAnalytics: React.FC = () => {
           <div>
             <div className="flex items-center space-x-2 text-xs uppercase font-extrabold tracking-wider text-red-400 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-red-400" />
-              <span>Interactive Delay Calculator</span>
+              <span>{t('interactiveCalculatorTitle')}</span>
             </div>
             <h3 className="text-xl font-bold text-white font-cinzel mb-1">
-              Estimate Case Acceleration
+              {t('interactiveCalculatorTitle')}
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Calculate the expected timeline compression for your pending or prospective litigation.
+              {t('interactiveCalculatorDesc')}
             </p>
 
             <div className="space-y-4 text-xs">
               <div>
-                <label className="text-slate-300 font-semibold block mb-1">Litigation Type</label>
+                <label className="text-slate-300 font-semibold block mb-1">{t('litigationType')}</label>
                 <select
                   value={caseType}
                   onChange={(e) => setCaseType(e.target.value)}
@@ -175,7 +186,7 @@ export const DelayReductionAnalytics: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-slate-300 font-semibold block mb-1">Traditional Expected Disposal Time</label>
+                <label className="text-slate-300 font-semibold block mb-1">{t('traditionalDisposalTime')}</label>
                 <div className="flex items-center space-x-3">
                   <input
                     type="range"
@@ -194,15 +205,15 @@ export const DelayReductionAnalytics: React.FC = () => {
             {/* Savings Result Card */}
             <div className="mt-6 p-5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">Timeline Reduction:</span>
+                <span className="text-xs text-slate-400">{t('timelineReduction')}</span>
                 <span className="text-base font-extrabold text-emerald-400 font-cinzel">~{savings.percent}% Faster</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">Estimated Disposal:</span>
+                <span className="text-xs text-slate-400">{t('estimatedDisposal')}</span>
                 <span className="text-sm font-bold text-white font-mono">{savings.expeditedMonths} Months (vs {estimatedMonths} Mo)</span>
               </div>
               <div className="pt-2 border-t border-zinc-800 text-[11px] text-slate-400 leading-relaxed">
-                🚀 Estimated time saved: <strong className="text-red-300">{savings.savedMonths} Months ({savings.savedMonths * 30} Days)</strong> of avoided courtroom delays and adjournments.
+                🚀 {t('estimatedTimeSaved')} <strong className="text-red-300">{savings.savedMonths} Months ({savings.savedMonths * 30} Days)</strong> of avoided courtroom delays and adjournments.
               </div>
             </div>
           </div>

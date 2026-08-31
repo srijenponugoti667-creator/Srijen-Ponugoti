@@ -31,11 +31,101 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
   const [cardCvv, setCardCvv] = useState<string>('742');
   const [selectedBank, setSelectedBank] = useState<string>('HDFC Bank');
   const [completedInvoice, setCompletedInvoice] = useState<PaymentInvoice | null>(null);
+  const [gatewayLoading, setGatewayLoading] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
+  const handleLaunchRazorpayGateway = async () => {
+    setGatewayLoading(true);
+    try {
+      // 1. Create order on server
+      const checkoutRes = await fetch('/api/membership/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMethod: 'Razorpay Gateway' }),
+      });
+      const checkoutData = await checkoutRes.json();
+
+      const razorpayKey = checkoutData.razorpayKeyId || 'rzp_test_TVt4WNqDvr1XOk';
+      const orderId = checkoutData.razorpayOrderId || checkoutData.orderId;
+
+      if ((window as any).Razorpay) {
+        const options = {
+          key: razorpayKey,
+          amount: checkoutData.totalAmount * 100,
+          currency: 'INR',
+          name: 'JusticeBridge Judicial Portal',
+          description: `${planTitle} (${isLawyer ? '₹3,999/month' : '₹2,999/year'})`,
+          image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=128&auto=format&fit=crop&q=80',
+          order_id: orderId.startsWith('order_') ? orderId : undefined,
+          prefill: {
+            name: currentUser.name,
+            email: currentUser.email,
+            contact: currentUser.phone ? currentUser.phone.replace(/[^0-9]/g, '').slice(-10) : undefined,
+          },
+          notes: {
+            userId: currentUser.id,
+            plan: planTitle,
+          },
+          theme: {
+            color: '#7f1d1d', // JusticeBridge red
+          },
+          handler: async function (response: any) {
+            setStep('processing');
+            try {
+              const verifyRes = await fetch('/api/membership/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: checkoutData.orderId,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id || checkoutData.razorpayOrderId,
+                  razorpay_signature: response.razorpay_signature,
+                  paymentMethod: 'Razorpay Gateway',
+                }),
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                setCompletedInvoice(verifyData.invoice);
+                setStep('success');
+                onPaymentSuccess(verifyData.user, verifyData.invoice);
+              } else {
+                alert('Payment verification failed on server. Please contact support.');
+                setStep('review');
+              }
+            } catch (vErr) {
+              console.error('Error during signature verification:', vErr);
+              setStep('review');
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setGatewayLoading(false);
+            },
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          alert(`Payment failed: ${resp.error.description || 'Transaction canceled'}`);
+          setGatewayLoading(false);
+        });
+        rzp.open();
+        setGatewayLoading(false);
+      } else {
+        // Fallback to in-app method selection
+        setGatewayLoading(false);
+        setStep('payment_method');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setGatewayLoading(false);
+      setStep('payment_method');
+    }
+  };
+
   const handleStartPayment = () => {
-    setStep('payment_method');
+    handleLaunchRazorpayGateway();
   };
 
   const handleConfirmAndPay = async () => {
@@ -68,7 +158,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
           alert('Payment verification failed. Please retry.');
           setStep('payment_method');
         }
-      }, 1500);
+      }, 1200);
     } catch (err) {
       console.error('Payment failure:', err);
       setStep('payment_method');
@@ -200,14 +290,39 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
                 </div>
               </div>
 
-              <button
-                id="btn-proceed-to-pay"
-                onClick={handleStartPayment}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 font-bold text-sm shadow-xl shadow-amber-900/40 flex items-center justify-center space-x-2 active:scale-95 transition-all"
-              >
-                <span>Proceed to Payment (₹{planFee.toLocaleString('en-IN')})</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  id="btn-proceed-to-pay"
+                  onClick={handleStartPayment}
+                  disabled={gatewayLoading}
+                  className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 font-bold text-sm shadow-xl shadow-amber-900/40 flex items-center justify-center space-x-2 active:scale-95 transition-all disabled:opacity-75 cursor-pointer"
+                >
+                  {gatewayLoading ? (
+                    <div className="w-5 h-5 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <Crown className="w-4 h-4 text-zinc-950" />
+                      <span>Pay with Razorpay (₹{planFee.toLocaleString('en-IN')})</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                  <span className="flex items-center space-x-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" />
+                    <span>Secured by Razorpay Payments</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStep('payment_method')}
+                    className="text-slate-400 hover:text-amber-400 underline transition-colors"
+                  >
+                    Direct / Custom Payment Methods
+                  </button>
+                </div>
+              </div>
 
             </div>
           )}

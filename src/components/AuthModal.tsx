@@ -218,7 +218,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98000 12345"
+                  placeholder="Enter your 10-digit mobile number"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
                 />
               </div>

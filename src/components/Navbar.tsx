@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Scale, ShieldCheck, AlertTriangle, UserCheck, RefreshCw, Crown, Search, Briefcase, FileText, BarChart3, ChevronDown, CheckCircle2, Calendar, UserPlus, Edit3 } from 'lucide-react';
+import { Scale, ShieldCheck, AlertTriangle, UserCheck, RefreshCw, Crown, Search, Briefcase, FileText, BarChart3, ChevronDown, CheckCircle2, Calendar, UserPlus, Edit3, Globe, Mic, Sparkles, Award } from 'lucide-react';
 import { User } from '../types';
+import { INDIAN_LANGUAGES, LanguageOption, getTranslation } from '../languages';
 
 interface NavbarProps {
   currentUser: User;
@@ -13,6 +14,9 @@ interface NavbarProps {
   onOpenAuthModal: () => void;
   onOpenConsultationsModal: () => void;
   onOpenProfileEditorModal: () => void;
+  onOpenVoiceCaseFilerModal?: () => void;
+  currentLanguage?: string;
+  onLanguageChange?: (langCode: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -26,8 +30,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuthModal,
   onOpenConsultationsModal,
   onOpenProfileEditorModal,
+  onOpenVoiceCaseFilerModal,
+  currentLanguage = 'te',
+  onLanguageChange
 }) => {
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
+
+  const activeLang = INDIAN_LANGUAGES.find(l => l.code === currentLanguage) || INDIAN_LANGUAGES[2];
+
+  const t = (key: any) => getTranslation(currentLanguage, key);
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/95 backdrop-blur-md shadow-2xl">
@@ -38,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div 
             id="brand-logo"
             onClick={() => setActiveTab('home')}
-            className="flex items-center space-x-3 cursor-pointer group select-none"
+            className="flex items-center space-x-3 cursor-pointer group select-none flex-shrink-0"
           >
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 via-red-800 to-zinc-950 flex items-center justify-center shadow-lg shadow-red-950/50 border border-red-500/40 group-hover:border-red-400 transition-all duration-300">
               <Scale className="w-6 h-6 text-slate-100 group-hover:scale-105 transition-transform duration-300" />
@@ -53,188 +65,226 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 hidden sm:block tracking-wide font-medium">
-                Bridging lawyers &bull; Empowering clients &bull; Reducing delays
+                {t('tagline')}
               </p>
             </div>
           </div>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-1">
+          <nav className="hidden xl:flex items-center space-x-1">
             <button
               id="nav-btn-home"
               onClick={() => setActiveTab('home')}
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'home'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              Overview
+              {t('overview')}
             </button>
 
             <button
               id="nav-btn-lawyers"
               onClick={() => setActiveTab('lawyers')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'lawyers'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <Briefcase className="w-4 h-4 text-red-400" />
-              <span>Find a Lawyer</span>
+              <Briefcase className="w-3.5 h-3.5 text-red-400" />
+              <span>{t('findLawyer')}</span>
+            </button>
+
+            <button
+              id="nav-btn-grading"
+              onClick={() => setActiveTab('grading')}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'grading'
+                  ? 'bg-zinc-900 text-amber-300 border border-amber-600/60 shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('grading')}</span>
             </button>
 
             <button
               id="nav-btn-find-case"
               onClick={() => setActiveTab('find_case')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'find_case'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <Search className="w-4 h-4 text-red-400" />
-              <span>Find a Case</span>
+              <Search className="w-3.5 h-3.5 text-red-400" />
+              <span>{t('findCase')}</span>
             </button>
 
             <button
               id="nav-btn-my-cases"
               onClick={() => setActiveTab('my_cases')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'my_cases'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <FileText className="w-4 h-4 text-red-400" />
-              <span>{currentUser.role === 'lawyer' ? 'Assigned Cases' : 'My Case Vault'}</span>
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <FileText className="w-3.5 h-3.5 text-red-400" />
+              <span>{currentUser.role === 'lawyer' ? 'Assigned Cases' : t('myCases')}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
             </button>
 
             <button
               id="nav-btn-delay-analytics"
               onClick={() => setActiveTab('analytics')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'analytics'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <BarChart3 className="w-4 h-4 text-red-400" />
-              <span>Delay Analytics</span>
+              <BarChart3 className="w-3.5 h-3.5 text-red-400" />
+              <span>{t('delayAnalytics')}</span>
             </button>
 
             <button
               id="nav-btn-legal-docs"
               onClick={() => setActiveTab('legal_docs')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'legal_docs'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <span>Legal Docs</span>
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('legalDocs')}</span>
             </button>
 
             <button
               id="nav-btn-ai-assistant"
               onClick={() => setActiveTab('ai_assistant')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'ai_assistant'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <Scale className="w-4 h-4 text-amber-400" />
-              <span>AI Counsel</span>
+              <Scale className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('aiCounsel')}</span>
             </button>
 
             <button
               id="nav-btn-consultations"
               onClick={onOpenConsultationsModal}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-zinc-900/60 transition-all"
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-zinc-900/60 transition-all"
             >
-              <Calendar className="w-4 h-4 text-red-400" />
-              <span>Consultations</span>
+              <Calendar className="w-3.5 h-3.5 text-red-400" />
+              <span>{t('consultations')}</span>
             </button>
 
             <button
               id="nav-btn-membership"
               onClick={() => setActiveTab('membership')}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'membership'
                   ? 'bg-zinc-900 text-red-200 border border-red-800/60 shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-zinc-900/60'
               }`}
             >
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span>Membership</span>
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('membership')}</span>
             </button>
           </nav>
 
-          {/* Right Controls: Persona Switcher & Membership Badge */}
-          <div className="flex items-center space-x-3">
+          {/* Right Controls: Language Selector, Voice Filer Button, Persona Switcher */}
+          <div className="flex items-center space-x-2.5">
             
-            {/* Quick Register / Switch Account Button */}
-            <button
-              id="btn-nav-auth-modal"
-              onClick={onOpenAuthModal}
-              className="hidden xl:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-slate-300 hover:text-white text-xs font-semibold transition-all"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-red-400" />
-              <span>New Account</span>
-            </button>
-
-            {/* Membership Action Button */}
-            {!currentUser.membershipActive ? (
+            {/* 1. Voice Case Filing Action Button */}
+            {onOpenVoiceCaseFilerModal && (
               <button
-                id="btn-nav-pay-membership"
-                onClick={onOpenPaymentModal}
-                className="hidden sm:inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-zinc-950 font-semibold text-xs shadow-lg shadow-amber-900/30 transition-all active:scale-95"
+                id="btn-nav-voice-file-case"
+                onClick={onOpenVoiceCaseFilerModal}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-700 to-amber-700 hover:from-red-600 text-white text-xs font-bold shadow-lg shadow-red-950/40 border border-red-500/40 cursor-pointer active:scale-95 transition-all"
+                title="Voice E-Filing for All Citizens (Illiterate / Non-Tech-Savvy)"
               >
-                <Crown className="w-3.5 h-3.5" />
-                <span>
-                  {currentUser.role === 'lawyer' ? 'Pay ₹3,999/mo' : 'Pay ₹2,999/yr'}
-                </span>
+                <Mic className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                <span className="hidden sm:inline">Voice Case Filing (కేసు నమోదు)</span>
+                <span className="sm:hidden">Voice E-File</span>
               </button>
-            ) : (
-              <div className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Member Active</span>
-              </div>
             )}
+
+            {/* 2. Indian Languages Switcher Menu */}
+            <div className="relative">
+              <button
+                id="btn-lang-selector"
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-750 text-xs font-semibold text-slate-200 transition-colors"
+                title="Select from 24 Indian Languages"
+              >
+                <Globe className="w-3.5 h-3.5 text-amber-400" />
+                <span className="max-w-[70px] sm:max-w-none truncate">{activeLang.nativeName}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {showLangMenu && (
+                <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl z-50 p-2 text-slate-200 animate-in fade-in zoom-in-95 scrollbar-thin">
+                  <div className="px-3 py-1.5 border-b border-zinc-800 mb-1 flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400">
+                      Indian Languages (24)
+                    </span>
+                    <span className="text-[10px] text-slate-500">భాషను ఎంచుకోండి</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1">
+                    {INDIAN_LANGUAGES.map((lang) => {
+                      const isSelected = lang.code === currentLanguage;
+                      return (
+                        <button
+                          key={lang.code}
+                          onClick={() => {
+                            if (onLanguageChange) onLanguageChange(lang.code);
+                            setShowLangMenu(false);
+                          }}
+                          className={`p-2 rounded-xl text-left text-xs transition-all ${
+                            isSelected
+                              ? 'bg-red-950 border border-red-700 text-white font-bold'
+                              : 'hover:bg-zinc-800/80 text-slate-300'
+                          }`}
+                        >
+                          <div className="truncate font-medium">{lang.nativeName}</div>
+                          <div className="text-[10px] text-slate-400 truncate">{lang.name}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Persona Switcher Menu */}
             <div className="relative">
               <button
                 id="persona-switcher-btn"
                 onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-                className="flex items-center space-x-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-750 text-left transition-colors"
+                className="flex items-center space-x-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-750 text-left transition-colors"
               >
                 <img
                   src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                   alt={currentUser.name}
-                  className="w-8 h-8 rounded-lg object-cover border border-red-800/60"
+                  className="w-7 h-7 rounded-lg object-cover border border-red-800/60"
                 />
                 <div className="hidden md:block text-left">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="text-xs font-bold text-slate-100 max-w-[120px] truncate">{currentUser.name}</span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-bold text-slate-100 max-w-[100px] truncate">{currentUser.name}</span>
                     {currentUser.role === 'lawyer' && currentUser.isVerifiedLawyer && (
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" title="Verified Advocate" />
-                    )}
-                    {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer && (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" title="Unverified - Verification Pending" />
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" title="Verified Advocate" />
                     )}
                   </div>
-                  <span className="text-[10px] text-slate-400 font-medium capitalize">
-                    {currentUser.role === 'lawyer' 
-                      ? (currentUser.isVerifiedLawyer ? 'Verified Advocate' : 'Unverified Lawyer') 
-                      : `Client (${currentUser.id === 'client_rohan' ? 'Tenant #1' : 'Tenant #2'})`}
-                  </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
 
               {/* Persona Switcher Dropdown */}
@@ -331,24 +381,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Register Custom Litigant/Lawyer</span>
                     </button>
                   </div>
-
-                  {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer && (
-                    <div className="mt-2 p-2 rounded-xl bg-amber-950/40 border border-amber-800/60">
-                      <p className="text-[11px] text-amber-200 leading-snug">
-                        ⚠️ Currently unverified. Cannot view confidential case files until verified.
-                      </p>
-                      <button
-                        id="btn-verify-bar-council"
-                        onClick={() => {
-                          setShowPersonaMenu(false);
-                          onOpenVerifyModal();
-                        }}
-                        className="mt-1.5 w-full py-1 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg transition-colors"
-                      >
-                        Verify Bar Council ID
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -357,14 +389,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Mobile Navigation bar */}
-        <div className="flex lg:hidden overflow-x-auto py-2 space-x-2 border-t border-zinc-800/60 scrollbar-none">
+        <div className="flex xl:hidden overflow-x-auto py-2 space-x-2 border-t border-zinc-800/60 scrollbar-none">
           <button
             onClick={() => setActiveTab('home')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${
               activeTab === 'home' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            Overview
+            {t('overview')}
           </button>
           <button
             onClick={() => setActiveTab('lawyers')}
@@ -372,7 +404,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'lawyers' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            Find a Lawyer
+            {t('findLawyer')}
+          </button>
+          <button
+            onClick={() => setActiveTab('grading')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${
+              activeTab === 'grading' ? 'bg-amber-950 text-amber-200 border border-amber-700' : 'text-slate-400'
+            }`}
+          >
+            {t('grading')}
           </button>
           <button
             onClick={() => setActiveTab('find_case')}
@@ -380,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'find_case' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            Find a Case
+            {t('findCase')}
           </button>
           <button
             onClick={() => setActiveTab('my_cases')}
@@ -388,7 +428,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'my_cases' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            {currentUser.role === 'lawyer' ? 'Assigned Cases' : 'My Cases (Isolated)'}
+            {currentUser.role === 'lawyer' ? 'Assigned Cases' : t('myCases')}
+          </button>
+          <button
+            onClick={() => setActiveTab('ai_assistant')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${
+              activeTab === 'ai_assistant' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
+            }`}
+          >
+            {t('aiCounsel')}
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -396,7 +444,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'analytics' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            Delay Analytics
+            {t('delayAnalytics')}
           </button>
           <button
             onClick={() => setActiveTab('membership')}
@@ -404,7 +452,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'membership' ? 'bg-red-950 text-red-200 border border-red-800' : 'text-slate-400'
             }`}
           >
-            Membership
+            {t('membership')}
           </button>
         </div>
       </div>

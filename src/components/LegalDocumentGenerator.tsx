@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { FileText, Download, Sparkles, CheckCircle, Copy, AlertCircle } from 'lucide-react';
+import { getTranslation } from '../languages';
 
 interface DocumentTemplate {
   id: string;
@@ -12,6 +13,10 @@ interface DocumentTemplate {
   fields: { key: string; label: string; placeholder: string; defaultValue?: string; type?: 'text' | 'textarea' | 'date' }[];
 }
 
+interface LegalDocumentGeneratorProps {
+  currentLanguage?: string;
+}
+
 const templates: DocumentTemplate[] = [
   {
     id: 'legal_notice_recovery',
@@ -20,13 +25,13 @@ const templates: DocumentTemplate[] = [
     description: 'Statutory 15-day demand notice under Section 138 NI Act / Order 37 CPC before initiating summary suit.',
     standardFee: '₹499',
     fields: [
-      { key: 'senderName', label: 'Sender / Claimant Full Name', placeholder: 'e.g. Acme Tech Solutions Pvt Ltd', defaultValue: 'Rohan Verma' },
-      { key: 'senderAddress', label: 'Sender Full Address', placeholder: 'e.g. 402, Cyber Tower, Sector 62, Noida, UP', defaultValue: 'B-104, Tech Residency, Outer Ring Road, Bengaluru - 560103' },
-      { key: 'recipientName', label: 'Recipient / Defaulter Name & Company', placeholder: 'e.g. Nexus Logistics India Pvt Ltd', defaultValue: 'Apex Infotech Solutions Pvt Ltd' },
-      { key: 'recipientAddress', label: 'Recipient Address', placeholder: 'e.g. 12, Nariman Point, Mumbai - 400021', defaultValue: '12th Floor, Express Towers, Nariman Point, Mumbai - 400021' },
-      { key: 'amountDue', label: 'Total Outstanding Amount (INR)', placeholder: 'e.g. ₹ 4,50,000/-', defaultValue: '₹ 3,75,000/-' },
-      { key: 'invoiceDetails', label: 'Invoice & Service Reference', placeholder: 'e.g. Invoice #INV-2025-091 dated 12/10/2025', defaultValue: 'Invoice #TECH-2025-882 dated 15th November 2025 for Cloud Integration Services' },
-      { key: 'demandPeriod', label: 'Notice Demand Cure Period', placeholder: 'e.g. 15 (Fifteen) Days', defaultValue: '15 (Fifteen) Days' }
+      { key: 'senderName', label: 'Sender / Claimant Full Name', placeholder: 'e.g. Acme Tech Solutions Pvt Ltd or Your Name' },
+      { key: 'senderAddress', label: 'Sender Full Address', placeholder: 'e.g. 402, Cyber Tower, Sector 62, Noida, UP' },
+      { key: 'recipientName', label: 'Recipient / Defaulter Name & Company', placeholder: 'e.g. Nexus Logistics India Pvt Ltd' },
+      { key: 'recipientAddress', label: 'Recipient Address', placeholder: 'e.g. 12, Nariman Point, Mumbai - 400021' },
+      { key: 'amountDue', label: 'Total Outstanding Amount (INR)', placeholder: 'e.g. ₹ 4,50,000/-' },
+      { key: 'invoiceDetails', label: 'Invoice & Service Reference', placeholder: 'e.g. Invoice #INV-2025-091 dated 12/10/2025 for Contractual Services' },
+      { key: 'demandPeriod', label: 'Notice Demand Cure Period', placeholder: 'e.g. 15 (Fifteen) Days' }
     ]
   },
   {
@@ -36,11 +41,11 @@ const templates: DocumentTemplate[] = [
     description: 'Legally enforceable bilateral confidentiality agreement protecting trade secrets, code, and financial data under the Indian Contract Act, 1872.',
     standardFee: '₹799',
     fields: [
-      { key: 'disclosingParty', label: 'Party A (First Party)', placeholder: 'Full Name / Entity Name', defaultValue: 'TechScale Innovations Pvt Ltd' },
-      { key: 'receivingParty', label: 'Party B (Second Party)', placeholder: 'Full Name / Entity Name', defaultValue: 'Global Enterprise Partners LLP' },
-      { key: 'purpose', label: 'Project / Evaluation Purpose', placeholder: 'e.g. Technical evaluation for API integration and venture investment', defaultValue: 'Evaluation of proprietary legal-tech workflow algorithms and strategic partnership' },
-      { key: 'jurisdictionCity', label: 'Governing Law & Jurisdiction City', placeholder: 'e.g. New Delhi / Bengaluru / Mumbai', defaultValue: 'Bengaluru, Karnataka' },
-      { key: 'termYears', label: 'Confidentiality Term (Years)', placeholder: 'e.g. 3 Years', defaultValue: '3 Years' }
+      { key: 'disclosingParty', label: 'Party A (First Party)', placeholder: 'e.g. Primary Corporation / Disclosing Entity Name' },
+      { key: 'receivingParty', label: 'Party B (Second Party)', placeholder: 'e.g. Partner Corporation / Receiving Entity Name' },
+      { key: 'purpose', label: 'Project / Evaluation Purpose', placeholder: 'e.g. Technical evaluation for API integration, partnership, or due diligence' },
+      { key: 'jurisdictionCity', label: 'Governing Law & Jurisdiction City', placeholder: 'e.g. New Delhi / Bengaluru / Mumbai / Hyderabad' },
+      { key: 'termYears', label: 'Confidentiality Term (Years)', placeholder: 'e.g. 2 Years / 3 Years' }
     ]
   },
   {
@@ -50,10 +55,10 @@ const templates: DocumentTemplate[] = [
     description: 'Sworn statement under Order XIX CPC and Oaths Act 1969 for court submissions, name rectification, or government departments.',
     standardFee: '₹299',
     fields: [
-      { key: 'deponentName', label: 'Deponent Full Name', placeholder: 'e.g. Rajesh Sharma S/o K.L. Sharma', defaultValue: 'Rohan Verma S/o Shri M.P. Verma' },
-      { key: 'deponentAge', label: 'Age (Years)', placeholder: 'e.g. 34 Years', defaultValue: '34 Years' },
-      { key: 'deponentAddress', label: 'Deponent Residential Address', placeholder: 'Complete address with Pincode', defaultValue: 'Flat 402, Green Glen Heights, Bellandur, Bengaluru - 560103' },
-      { key: 'statementFacts', label: 'Sworn Statement Facts (Paragraph by Paragraph)', placeholder: 'Detailed true facts stated on solemn affirmation...', defaultValue: '1. That I am the authorized director of TechScale Innovations and competent to swear this affidavit.\n2. That the electronic records, invoice registers, and server audit logs submitted herewith are authentic and generated in the ordinary course of business.\n3. That no material facts have been concealed or suppressed from the Hon\'ble Court.', type: 'textarea' }
+      { key: 'deponentName', label: 'Deponent Full Name', placeholder: 'e.g. Full Legal Name S/o or D/o Parent Name' },
+      { key: 'deponentAge', label: 'Age (Years)', placeholder: 'e.g. 32 Years' },
+      { key: 'deponentAddress', label: 'Deponent Residential Address', placeholder: 'Complete permanent or current address with Pincode' },
+      { key: 'statementFacts', label: 'Sworn Statement Facts (Paragraph by Paragraph)', placeholder: '1. That I am a citizen of India residing at the above address.\n2. That the facts stated herein are true and correct to the best of my knowledge.\n3. That no material facts have been suppressed.', type: 'textarea' }
     ]
   },
   {
@@ -63,17 +68,18 @@ const templates: DocumentTemplate[] = [
     description: 'Standard 11-month registered lease agreement protecting landlord security deposit and tenant peaceful possession under State Rent Control Acts.',
     standardFee: '₹599',
     fields: [
-      { key: 'landlordName', label: 'Landlord / Lessor Name', placeholder: 'e.g. Smt. Lakshmi Narayanan', defaultValue: 'Smt. Lakshmi Narayanan' },
-      { key: 'tenantName', label: 'Tenant / Lessee Name', placeholder: 'e.g. Rohan Verma', defaultValue: 'Rohan Verma' },
-      { key: 'propertyAddress', label: 'Premises Address', placeholder: 'Full address of rented flat/house', defaultValue: 'Flat No. 302, 3rd Floor, Shanthi Vihar Apartments, Indiranagar, Bengaluru - 560038' },
-      { key: 'monthlyRent', label: 'Monthly Rent (INR)', placeholder: 'e.g. ₹ 32,000/- per month', defaultValue: '₹ 35,000/- per month' },
-      { key: 'securityDeposit', label: 'Refundable Security Deposit (INR)', placeholder: 'e.g. ₹ 1,50,000/-', defaultValue: '₹ 1,50,000/-' },
-      { key: 'leaseTenure', label: 'Lease Duration', placeholder: 'e.g. 11 Months', defaultValue: '11 Months' }
+      { key: 'landlordName', label: 'Landlord / Lessor Name', placeholder: 'e.g. Full Name of Property Owner' },
+      { key: 'tenantName', label: 'Tenant / Lessee Name', placeholder: 'e.g. Full Name of Tenant' },
+      { key: 'propertyAddress', label: 'Premises Address', placeholder: 'Complete flat/house number, building, street, and city with Pincode' },
+      { key: 'monthlyRent', label: 'Monthly Rent (INR)', placeholder: 'e.g. ₹ 25,000/- per month' },
+      { key: 'securityDeposit', label: 'Refundable Security Deposit (INR)', placeholder: 'e.g. ₹ 1,00,000/-' },
+      { key: 'leaseTenure', label: 'Lease Duration', placeholder: 'e.g. 11 Months' }
     ]
   }
 ];
 
-export const LegalDocumentGenerator: React.FC = () => {
+export const LegalDocumentGenerator: React.FC<LegalDocumentGeneratorProps> = ({ currentLanguage = 'en' }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate>(templates[0]);
   const [formValues, setFormValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -276,13 +282,13 @@ WITNESS 1: _____________________     WITNESS 2: _____________________`;
       <div className="mb-8">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-950/60 border border-red-800/60 text-red-300 text-xs font-semibold uppercase tracking-wider mb-2">
           <Sparkles className="w-3.5 h-3.5 text-red-400" />
-          <span>Real Legal Document Engine</span>
+          <span>{t('legalDocEngineBadge')}</span>
         </div>
         <h1 className="text-3xl font-bold text-white tracking-tight">
-          Automated Legal Document Generator
+          {t('legalDocGeneratorTitle')}
         </h1>
         <p className="text-slate-400 text-sm mt-1">
-          Generate, customize, and export court-ready legal notices, non-disclosure agreements, affidavits, and lease deeds into downloadable PDFs instantly.
+          {t('legalDocGeneratorSubtitle')}
         </p>
       </div>
 
@@ -290,7 +296,7 @@ WITNESS 1: _____________________     WITNESS 2: _____________________`;
         {/* Left Column: Template Selection */}
         <div className="lg:col-span-4 space-y-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-            Select Legal Document Type
+            {t('selectDocType')}
           </h2>
           {templates.map(tpl => {
             const isSelected = tpl.id === selectedTemplate.id;

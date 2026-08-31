@@ -82,6 +82,21 @@ export interface CaseMatter {
   summaryBrief?: string;
 }
 
+export interface LawyerReview {
+  id: string;
+  lawyerId: string;
+  clientId: string;
+  clientName: string;
+  clientAvatar?: string;
+  rating: number; // 1 to 5
+  caseType: string;
+  caseOutcome: 'Won' | 'Compromised' | 'Ongoing' | 'Lost';
+  comment: string;
+  courtName?: string;
+  verifiedLitigant: boolean;
+  createdAt: string;
+}
+
 export interface LawyerProfile {
   id: string;
   name: string;
@@ -98,6 +113,17 @@ export interface LawyerProfile {
   bio: string;
   casesResolved: number;
   activeCasesCount: number;
+  casesTotal: number;
+  casesWon: number;
+  casesLost: number;
+  casesCompromised: number;
+  casesOngoing: number;
+  winRate: number;
+  compromiseRate?: number;
+  grade: 'A+' | 'A' | 'B+' | 'B';
+  tierTitle?: string;
+  badges: string[];
+  reviews?: LawyerReview[];
   contactEmail: string;
   phone: string;
   availableDays: string[];

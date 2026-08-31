@@ -1,13 +1,30 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking } from './src/types.js';
+import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.use(express.json());
+
+// Razorpay Credentials Configuration
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TVt4WNqDvr1XOk';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'FIAbUF8jiqdhQI4EE2402fpW';
+
+let razorpayClient: Razorpay | null = null;
+function getRazorpayClient(): Razorpay {
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpayClient;
+}
 
 // Initialize Gemini API client lazily
 let aiClient: GoogleGenAI | null = null;
@@ -40,7 +57,73 @@ const users: Record<string, User> = {
     bio: 'Senior Advocate with 15+ years experience in high-stakes corporate litigation, constitutional remedies, and commercial dispute resolution.',
     rating: 4.9,
     reviewCount: 128,
-    casesWon: 94
+    casesWon: 108
+  },
+  'lawyer_vikram': {
+    id: 'lawyer_vikram',
+    name: 'Adv. Vikramaditya Rao',
+    email: 'vikram.rao@justicebridge.law',
+    role: 'lawyer',
+    phone: '+91 98450 33219',
+    isVerifiedLawyer: true,
+    barCouncilNumber: 'KAR/2841/2006',
+    stateBarCouncil: 'Karnataka State Bar Council',
+    practiceLocation: 'Karnataka High Court & Supreme Court',
+    yearsExperience: 20,
+    specialization: ['Civil & Property', 'Constitutional Writ', 'Commercial Dispute'],
+    membershipActive: true,
+    membershipPlan: 'advocate_monthly',
+    membershipExpiresAt: '2027-01-01T00:00:00.000Z',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    consultationFee: 4200,
+    bio: 'Distinguished veteran counsel with 20 years of practice in real estate title litigation, land acquisition, constitutional petitions, and high-value civil trials.',
+    rating: 4.9,
+    reviewCount: 184,
+    casesWon: 162
+  },
+  'lawyer_meenakshi': {
+    id: 'lawyer_meenakshi',
+    name: 'Adv. Meenakshi Sundaram',
+    email: 'meenakshi.s@justicebridge.law',
+    role: 'lawyer',
+    phone: '+91 94440 91823',
+    isVerifiedLawyer: true,
+    barCouncilNumber: 'TN/5129/2012',
+    stateBarCouncil: 'Bar Council of Tamil Nadu & Puducherry',
+    practiceLocation: 'Madras High Court & Supreme Court',
+    yearsExperience: 14,
+    specialization: ['Corporate Arbitration', 'Commercial Dispute', 'Intellectual Property'],
+    membershipActive: true,
+    membershipPlan: 'advocate_monthly',
+    membershipExpiresAt: '2026-12-31T00:00:00.000Z',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    consultationFee: 3200,
+    bio: 'Lead counsel specializing in cross-border corporate arbitration, supply chain contracts, and patent/trademark litigation.',
+    rating: 4.9,
+    reviewCount: 92,
+    casesWon: 84
+  },
+  'lawyer_harpreet': {
+    id: 'lawyer_harpreet',
+    name: 'Adv. Harpreet Singh Gill',
+    email: 'harpreet.gill@justicebridge.law',
+    role: 'lawyer',
+    phone: '+91 98140 77122',
+    isVerifiedLawyer: true,
+    barCouncilNumber: 'P&H/3301/2014',
+    stateBarCouncil: 'Bar Council of Punjab & Haryana',
+    practiceLocation: 'Punjab & Haryana High Court & Delhi HC',
+    yearsExperience: 12,
+    specialization: ['Criminal Defense', 'Constitutional Writ', 'Cyber Crime'],
+    membershipActive: true,
+    membershipPlan: 'advocate_monthly',
+    membershipExpiresAt: '2026-11-15T00:00:00.000Z',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    consultationFee: 2800,
+    bio: 'Trial defense counsel with focus on BNSS, economic offenses, and fundamental rights writs.',
+    rating: 4.7,
+    reviewCount: 76,
+    casesWon: 67
   },
   'lawyer_ananya': {
     id: 'lawyer_ananya',
@@ -52,16 +135,16 @@ const users: Record<string, User> = {
     barCouncilNumber: 'MH/9921/2023 (Verification In Progress)',
     stateBarCouncil: 'Bar Council of Maharashtra & Goa',
     practiceLocation: 'Bombay High Court & City Civil Court',
-    yearsExperience: 2,
+    yearsExperience: 4,
     specialization: ['Cyber Crime', 'Intellectual Property', 'Civil & Property'],
     membershipActive: false,
     membershipPlan: 'advocate_monthly',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     consultationFee: 2000,
     bio: 'Associate Advocate specializing in technology contracts, data privacy litigations, and trademark protection.',
-    rating: 4.7,
+    rating: 4.8,
     reviewCount: 34,
-    casesWon: 18
+    casesWon: 29
   },
   'client_rohan': {
     id: 'client_rohan',
@@ -89,29 +172,10 @@ const users: Record<string, User> = {
 // Global active persona for demonstration & testing
 let currentUserId = 'client_rohan';
 
-// Mock Consultations Store
-let consultationBookings: ConsultationBooking[] = [
-  {
-    id: 'con_01',
-    clientId: 'client_rohan',
-    clientName: 'Rohan Verma',
-    clientEmail: 'rohan.verma@techscale.io',
-    clientPhone: '+91 98200 11987',
-    lawyerId: 'lawyer_rajesh',
-    lawyerName: 'Adv. Rajesh Sharma',
-    bookingDate: '2026-09-05',
-    timeSlot: '11:00 AM - 12:00 PM',
-    consultationType: 'Video Call',
-    matterSubject: 'Section 65B Electronic Discovery & Cross-Examination Strategy',
-    status: 'Confirmed',
-    fee: 3500,
-    meetingLink: 'https://meet.justicebridge.law/sec-hearing-9912',
-    notes: 'Please keep AWS server latency logs and contract exhibits ready.',
-    createdAt: '2026-08-20T10:00:00.000Z'
-  }
-];
+// Consultations Store
+let consultationBookings: ConsultationBooking[] = [];
 
-// Mock Lawyers Directory
+// Verified Advocates Directory with Grading Performance Records
 let lawyersDirectory: LawyerProfile[] = [
   {
     id: 'lawyer_rajesh',
@@ -121,396 +185,395 @@ let lawyersDirectory: LawyerProfile[] = [
     isVerified: true,
     specialization: ['Commercial Dispute', 'Constitutional Writ', 'Corporate Arbitration'],
     experienceYears: 15,
-    courts: ['Supreme Court of India', 'Delhi High Court', 'NCLAT'],
+    courts: ['Supreme Court of India', 'Delhi High Court', 'NCLT Delhi'],
     rating: 4.9,
     reviewsCount: 128,
     consultationFee: 3500,
-    location: 'New Delhi, Delhi',
-    bio: 'Specialist in commercial litigation, breach of contract, shareholder disputes, and fundamental rights writs.',
-    casesResolved: 342,
-    activeCasesCount: 14,
+    location: 'New Delhi, India',
+    bio: 'Senior Advocate with 15+ years experience in high-stakes corporate litigation, constitutional remedies, and commercial dispute resolution. Proven record in fast-track arbitration and pre-litigation settlements.',
+    casesResolved: 127,
+    activeCasesCount: 15,
+    casesTotal: 142,
+    casesWon: 108,
+    casesLost: 9,
+    casesCompromised: 19,
+    casesOngoing: 6,
+    winRate: 76.1,
+    compromiseRate: 13.4,
+    grade: 'A+',
+    tierTitle: 'Tier 1 Senior Trial Litigator',
+    badges: ['BCI Gold Verified', 'Top Trial Counsel', 'Mediation Master', 'Supreme Court Designated', 'Client Choice 2026'],
     contactEmail: 'rajesh.sharma@justicebridge.law',
     phone: '+91 98112 44321',
-    availableDays: ['Mon', 'Tue', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80'
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
+    reviews: [
+      {
+        id: 'rev_1',
+        lawyerId: 'lawyer_rajesh',
+        clientId: 'client_rohan',
+        clientName: 'Rohan Verma',
+        clientAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        rating: 5,
+        caseType: 'Commercial Dispute',
+        caseOutcome: 'Won',
+        comment: 'Adv. Rajesh secured an urgent ex-parte interim injunction in Delhi High Court within 3 hearings. Exceptional court craft, razor-sharp statutory knowledge, and completely transparent fee structure.',
+        courtName: 'Delhi High Court',
+        verifiedLitigant: true,
+        createdAt: '2026-07-14'
+      },
+      {
+        id: 'rev_2',
+        lawyerId: 'lawyer_rajesh',
+        clientId: 'client_priya',
+        clientName: 'Priya Nair',
+        clientAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+        rating: 5,
+        caseType: 'Corporate Arbitration',
+        caseOutcome: 'Compromised',
+        comment: 'Guided our infrastructure joint-venture through Section 9 arbitration and achieved a mutually beneficial settlement agreement, saving us 2 years of courtroom litigation.',
+        courtName: 'Delhi International Arbitration Centre',
+        verifiedLitigant: true,
+        createdAt: '2026-06-22'
+      },
+      {
+        id: 'rev_3',
+        lawyerId: 'lawyer_rajesh',
+        clientId: 'client_anand',
+        clientName: 'Anand Infrastructure Ltd',
+        rating: 5,
+        caseType: 'Constitutional Writ',
+        caseOutcome: 'Won',
+        comment: 'Won a landmark Article 226 writ petition quashing an arbitrary municipal tender disqualification. Highly recommended for commercial and constitutional matters.',
+        courtName: 'Supreme Court of India',
+        verifiedLitigant: true,
+        createdAt: '2026-05-18'
+      }
+    ]
+  },
+  {
+    id: 'lawyer_vikram',
+    name: 'Adv. Vikramaditya Rao',
+    barCouncilNumber: 'KAR/2841/2006',
+    stateBarCouncil: 'Karnataka State Bar Council',
+    isVerified: true,
+    specialization: ['Civil & Property', 'Constitutional Writ', 'Commercial Dispute'],
+    experienceYears: 20,
+    courts: ['Supreme Court of India', 'Karnataka High Court', 'City Civil Court Bengaluru'],
+    rating: 4.9,
+    reviewsCount: 184,
+    consultationFee: 4200,
+    location: 'Bengaluru, Karnataka',
+    bio: 'Distinguished veteran counsel with 20 years of practice in real estate title litigation, land acquisition, constitutional petitions, and high-value civil trials.',
+    casesResolved: 198,
+    activeCasesCount: 12,
+    casesTotal: 210,
+    casesWon: 162,
+    casesLost: 14,
+    casesCompromised: 26,
+    casesOngoing: 8,
+    winRate: 77.1,
+    compromiseRate: 12.4,
+    grade: 'A+',
+    tierTitle: 'Distinguished Veteran Senior Counsel',
+    badges: ['BCI Platinum Verified', 'Supreme Court Veteran', 'Lok Adalat Champion', 'Speedy Disposal Champion'],
+    contactEmail: 'vikram.rao@justicebridge.law',
+    phone: '+91 98450 33219',
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Sat'],
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    reviews: [
+      {
+        id: 'rev_4',
+        lawyerId: 'lawyer_vikram',
+        clientId: 'client_satish',
+        clientName: 'Satish Chandran',
+        rating: 5,
+        caseType: 'Civil & Property',
+        caseOutcome: 'Won',
+        comment: 'Resolved our 12-acre partition suit in record time. Adv. Vikramaditya’s grasp of Karnataka Land Revenue Act is peerless.',
+        courtName: 'Karnataka High Court',
+        verifiedLitigant: true,
+        createdAt: '2026-08-02'
+      },
+      {
+        id: 'rev_5',
+        lawyerId: 'lawyer_vikram',
+        clientId: 'client_meera',
+        clientName: 'Meera Kulkarni',
+        rating: 5,
+        caseType: 'Commercial Dispute',
+        caseOutcome: 'Compromised',
+        comment: 'Facilitated a clean Lok Adalat compromise deed in our commercial lease dispute, saving enormous stamp duty and court fees.',
+        courtName: 'City Civil Court Bengaluru',
+        verifiedLitigant: true,
+        createdAt: '2026-07-28'
+      }
+    ]
   },
   {
     id: 'lawyer_meenakshi',
     name: 'Adv. Meenakshi Sundaram',
-    barCouncilNumber: 'TN/2841/2008',
-    stateBarCouncil: 'Bar Council of Tamil Nadu',
+    barCouncilNumber: 'TN/5129/2012',
+    stateBarCouncil: 'Bar Council of Tamil Nadu & Puducherry',
     isVerified: true,
-    specialization: ['Civil & Property', 'Family Law', 'Real Estate'],
-    experienceYears: 17,
-    courts: ['Madras High Court', 'City Civil Court Chennai'],
-    rating: 4.8,
-    reviewsCount: 164,
-    consultationFee: 2800,
-    location: 'Chennai, Tamil Nadu',
-    bio: 'Dedicated advocate with exhaustive expertise in title deeds validation, partition suits, and family settlements.',
-    casesResolved: 410,
-    activeCasesCount: 19,
-    contactEmail: 'meenakshi.s@justicebridge.law',
-    phone: '+91 98401 55670',
-    availableDays: ['Mon', 'Wed', 'Fri', 'Sat'],
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'lawyer_vikram',
-    name: 'Adv. Vikramaditya Rathore',
-    barCouncilNumber: 'KA/5102/2014',
-    stateBarCouncil: 'Karnataka State Bar Council',
-    isVerified: true,
-    specialization: ['Cyber Crime', 'Corporate Arbitration', 'Intellectual Property'],
-    experienceYears: 11,
-    courts: ['Karnataka High Court', 'Commercial Court Bengaluru'],
+    specialization: ['Corporate Arbitration', 'Commercial Dispute', 'Intellectual Property'],
+    experienceYears: 14,
+    courts: ['Madras High Court', 'Supreme Court of India', 'NCLAT Chennai'],
     rating: 4.9,
     reviewsCount: 92,
-    consultationFee: 4000,
-    location: 'Bengaluru, Karnataka',
-    bio: 'Leading cybersecurity counsel, patent attorney, and counsel for tech startups in multi-jurisdictional disputes.',
-    casesResolved: 215,
-    activeCasesCount: 8,
-    contactEmail: 'vikram.rathore@justicebridge.law',
-    phone: '+91 99002 88411',
-    availableDays: ['Tue', 'Wed', 'Thu', 'Sat'],
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+    consultationFee: 3200,
+    location: 'Chennai, Tamil Nadu',
+    bio: 'Lead counsel specializing in cross-border corporate arbitration, supply chain contracts, and patent/trademark litigation with extensive experience before Madras HC.',
+    casesResolved: 105,
+    activeCasesCount: 13,
+    casesTotal: 118,
+    casesWon: 84,
+    casesLost: 7,
+    casesCompromised: 21,
+    casesOngoing: 6,
+    winRate: 71.2,
+    compromiseRate: 17.8,
+    grade: 'A+',
+    tierTitle: 'Arbitration & Corporate Law Specialist',
+    badges: ['Arbitration Master', 'BCI Gold Verified', 'Dispute Resolution Award', 'Client Choice 2026'],
+    contactEmail: 'meenakshi.s@justicebridge.law',
+    phone: '+91 94440 91823',
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    reviews: [
+      {
+        id: 'rev_6',
+        lawyerId: 'lawyer_meenakshi',
+        clientId: 'client_karthik',
+        clientName: 'Karthik Raja',
+        rating: 5,
+        caseType: 'Corporate Arbitration',
+        caseOutcome: 'Won',
+        comment: 'Adv. Meenakshi won our international supply contract arbitration with 100% damages award. Exceptional cross-examination skills.',
+        courtName: 'Madras High Court',
+        verifiedLitigant: true,
+        createdAt: '2026-08-11'
+      }
+    ]
+  },
+  {
+    id: 'lawyer_harpreet',
+    name: 'Adv. Harpreet Singh Gill',
+    barCouncilNumber: 'P&H/3301/2014',
+    stateBarCouncil: 'Bar Council of Punjab & Haryana',
+    isVerified: true,
+    specialization: ['Criminal Defense', 'Constitutional Writ', 'Cyber Crime'],
+    experienceYears: 12,
+    courts: ['Punjab & Haryana High Court', 'Delhi High Court', 'Supreme Court of India'],
+    rating: 4.7,
+    reviewsCount: 76,
+    consultationFee: 2800,
+    location: 'Chandigarh / New Delhi',
+    bio: 'Trial lawyer with intense focus on criminal defense under Bharatiya Nagarik Suraksha Sanhita (BNSS), white-collar fraud defenses, and fundamental rights writs.',
+    casesResolved: 82,
+    activeCasesCount: 12,
+    casesTotal: 94,
+    casesWon: 67,
+    casesLost: 11,
+    casesCompromised: 12,
+    casesOngoing: 4,
+    winRate: 71.3,
+    compromiseRate: 12.8,
+    grade: 'A',
+    tierTitle: 'Trial Defense & Constitutional Specialist',
+    badges: ['Top Trial Advocate', 'Bail & Trial Specialist', 'High Court Veteran'],
+    contactEmail: 'harpreet.gill@justicebridge.law',
+    phone: '+91 98140 77122',
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    reviews: [
+      {
+        id: 'rev_7',
+        lawyerId: 'lawyer_harpreet',
+        clientId: 'client_gurpreet',
+        clientName: 'Gurpreet Singh',
+        rating: 5,
+        caseType: 'Criminal Defense',
+        caseOutcome: 'Won',
+        comment: 'Secured regular bail and quashing of Section 420 charges under new BNSS provisions in record time. Tremendous integrity and dedication.',
+        courtName: 'Punjab & Haryana High Court',
+        verifiedLitigant: true,
+        createdAt: '2026-07-05'
+      }
+    ]
   },
   {
     id: 'lawyer_ananya',
     name: 'Adv. Ananya Sen',
-    barCouncilNumber: 'MH/9921/2023 (Pending Verification)',
+    barCouncilNumber: 'MH/9921/2023 (Verification In Progress)',
     stateBarCouncil: 'Bar Council of Maharashtra & Goa',
-    isVerified: false, // Verification pending
+    isVerified: false,
     specialization: ['Cyber Crime', 'Intellectual Property', 'Civil & Property'],
-    experienceYears: 2,
+    experienceYears: 4,
     courts: ['Bombay High Court', 'City Civil Court Mumbai'],
-    rating: 4.7,
+    rating: 4.8,
     reviewsCount: 34,
     consultationFee: 2000,
     location: 'Mumbai, Maharashtra',
-    bio: 'Fast-rising advocate focusing on digital compliance, copyright infringement, and consumer rights litigation.',
-    casesResolved: 28,
-    activeCasesCount: 5,
+    bio: 'Associate Advocate specializing in technology contracts, data privacy litigations, cyber fraud recovery, and trademark protection.',
+    casesResolved: 37,
+    activeCasesCount: 9,
+    casesTotal: 46,
+    casesWon: 29,
+    casesLost: 5,
+    casesCompromised: 8,
+    casesOngoing: 4,
+    winRate: 63.0,
+    compromiseRate: 17.4,
+    grade: 'A',
+    tierTitle: 'Emerging Tech & IP Advocate',
+    badges: ['Fast-Track Resolution', 'Cyber Law Specialist', 'High Speed Settlement'],
     contactEmail: 'ananya.sen@justicebridge.law',
     phone: '+91 97401 88219',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'lawyer_karan',
-    name: 'Adv. Karan Singhania',
-    barCouncilNumber: 'WB/1109/2005',
-    stateBarCouncil: 'Bar Council of West Bengal',
-    isVerified: true,
-    specialization: ['Criminal Defense', 'Constitutional Writ', 'Commercial Dispute'],
-    experienceYears: 20,
-    courts: ['Calcutta High Court', 'Sessions Court Kolkata'],
-    rating: 4.95,
-    reviewsCount: 240,
-    consultationFee: 5000,
-    location: 'Kolkata, West Bengal',
-    bio: 'Senior defense counsel known for rigorous cross-examinations and high-profile appellate representations.',
-    casesResolved: 560,
-    activeCasesCount: 16,
-    contactEmail: 'karan.singhania@justicebridge.law',
-    phone: '+91 98310 99450',
-    availableDays: ['Mon', 'Wed', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    reviews: [
+      {
+        id: 'rev_8',
+        lawyerId: 'lawyer_ananya',
+        clientId: 'client_deepak',
+        clientName: 'Deepak Merchant',
+        rating: 5,
+        caseType: 'Cyber Crime',
+        caseOutcome: 'Won',
+        comment: 'Recovered frozen fintech transaction funds through cyber cell coordination and magistrate order within 3 weeks.',
+        courtName: 'Bombay High Court',
+        verifiedLitigant: true,
+        createdAt: '2026-08-19'
+      }
+    ]
   }
 ];
 
 // Mock Invoices
-let invoices: PaymentInvoice[] = [
-  {
-    id: 'INV-2026-8801',
-    invoiceNumber: 'JB-INV-2026-8801',
-    userId: 'client_priya',
-    userName: 'Priya Nair',
-    userRole: 'client',
-    planName: 'Annual Client Justice Pass',
-    planDuration: '1 Year (365 Days)',
-    amount: 2541.53,
-    taxAmount: 457.47,
-    totalAmount: 2999.00,
-    currency: 'INR',
-    status: 'Paid',
-    paymentMethod: 'UPI (Google Pay)',
-    transactionId: 'TXN_UPI_994821038592',
-    paidAt: '2026-04-15T11:20:00.000Z',
-    expiresAt: '2027-04-15T00:00:00.000Z'
-  }
-];
+let invoices: PaymentInvoice[] = [];
 
 // Cases Store
 let casesStore: CaseMatter[] = [
   {
-    id: 'case_tech_dispute_01',
-    caseNumber: 'COMM/DL/2026/0419',
-    cnrNumber: 'DLHC01-004192-2026',
-    title: 'TechScale Logistics vs. Apex Horizon Systems Ltd.',
+    id: 'case_rohan_1',
+    caseNumber: 'COMM-SUIT/DL/2026/418',
+    cnrNumber: 'JB01-849201-2026',
+    title: 'TechScale Solutions Pvt Ltd vs. Bharat Supply Logistics Corp',
     caseType: 'Commercial Dispute',
-    filingDate: '2026-01-14',
+    filingDate: '2026-02-10',
     courtName: 'High Court of Delhi (Commercial Division)',
-    jurisdiction: 'New Delhi, Delhi',
-    bench: 'Division Bench III (Hon\'ble Justice S. K. Kaul & Justice R. Menon)',
-    judgeName: 'Hon\'ble Justice Sanjeev Khanna',
-    petitioner: 'TechScale Logistics Private Limited (Rep. by Rohan Verma)',
-    respondent: 'Apex Horizon Systems Ltd. & Anr.',
-    clientId: 'client_rohan', // BELONGS TO CLIENT ROHAN
+    jurisdiction: 'High Court Commercial Jurisdiction',
+    bench: 'Commercial Appellate Division Bench II',
+    judgeName: 'Hon\'ble Justice S. K. Kaul (Presiding)',
+    petitioner: 'Rohan Verma (TechScale Solutions)',
+    respondent: 'Bharat Supply Logistics Corp',
+    clientId: 'client_rohan',
     clientName: 'Rohan Verma',
     clientEmail: 'rohan.verma@techscale.io',
     assignedLawyerId: 'lawyer_rajesh',
     assignedLawyerName: 'Adv. Rajesh Sharma',
-    status: 'Evidence',
-    stageDescription: 'Cross-examination of Claimant Key Witness & Forensic Server Audit Validation',
-    daysElapsed: 74,
-    estimatedDisposalDays: 140,
+    status: 'Arguments',
+    stageDescription: 'Final Arguments on Section 9 Commercial Injunction Application',
+    daysElapsed: 42,
+    estimatedDisposalDays: 95,
     delayRiskScore: 'Low',
-    delayDays: 12,
-    bottleneckReason: 'Minor delay in submitting translated electronic discovery audit logs.',
-    nextHearingDate: '2026-09-12',
-    summaryBrief: 'Breach of Cloud Infrastructure Service Level Agreement (SLA) with claim of damages amounting to ₹4.2 Crores due to unnotified downtime and proprietary code leak.',
+    delayDays: 0,
+    summaryBrief: 'Commercial recovery suit seeking ₹4.2 Crore unpaid invoices and damages under Section 9 of the Commercial Courts Act.',
+    nextHearingDate: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString().split('T')[0],
     hearings: [
       {
-        id: 'h_01',
-        hearingDate: '2026-02-02',
-        courtRoom: 'Courtroom 14, Delhi High Court',
-        judgeName: 'Hon\'ble Justice Sanjeev Khanna',
-        stage: 'First Scrutiny & Notice',
-        purpose: 'Issuance of Summons and Electronic Notice to Respondent',
-        notes: 'Summons served electronically. Respondent counsel entered appearance.',
-        status: 'Completed'
-      },
-      {
-        id: 'h_02',
-        hearingDate: '2026-05-18',
-        courtRoom: 'Courtroom 14, Delhi High Court',
-        judgeName: 'Hon\'ble Justice Sanjeev Khanna',
-        stage: 'Pleadings & Framing of Issues',
-        purpose: 'Filing of Written Statement and Framing of 5 Key Triable Issues',
-        notes: 'Issues framed regarding server audit admissibility and liquidated damages cap.',
-        status: 'Completed'
-      },
-      {
-        id: 'h_03',
-        hearingDate: '2026-09-12',
-        courtRoom: 'Courtroom 14, Delhi High Court',
-        judgeName: 'Hon\'ble Justice Sanjeev Khanna',
-        stage: 'Evidence',
-        purpose: 'Petitioner PW-1 cross examination by respondent senior counsel',
+        id: 'h_101',
+        hearingDate: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString().split('T')[0],
+        courtRoom: 'Courtroom 4, High Court of Delhi',
+        judgeName: 'Hon\'ble Justice S. K. Kaul',
+        stage: 'Final Arguments',
+        purpose: 'Hearing on Interim Relief & Order XXXIX Injunction',
         status: 'Scheduled'
       }
     ],
     documents: [
       {
-        id: 'doc_01',
-        title: 'Original Plaint & Commercial Statement of Claim',
-        fileName: 'Plaint_TechScale_vs_Apex_DL2026.pdf',
+        id: 'doc_101',
+        title: 'Original Commercial Plaint & Statement of Truth',
+        fileName: 'Plaint_TechScale_v_BharatLogistics.pdf',
         fileType: 'pdf',
         fileSize: '4.8 MB',
-        uploadedAt: '2026-01-14',
+        uploadedAt: '2026-02-10',
         uploadedBy: 'Adv. Rajesh Sharma',
         fileCategory: 'Petition',
         isRestricted: true,
         documentHash: 'sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
-        pageCount: 42,
-        summary: 'Contains the complete statement of facts, prayer for damages of ₹4.2 Crores, and breach timeline under Section 9 of the Commercial Courts Act.'
+        pageCount: 48,
+        summary: 'Complete commercial plaint with verified e-affidavit and annexures.'
       },
       {
-        id: 'doc_02',
-        title: 'Vakalatnama & Advocate Authorization Memo',
-        fileName: 'Vakalatnama_RajeshSharma_D1482.pdf',
+        id: 'doc_102',
+        title: 'Section 65B Electronic Evidence Affidavit',
+        fileName: 'Sec65B_Certificate_DigitalLogs.pdf',
         fileType: 'pdf',
-        fileSize: '1.2 MB',
-        uploadedAt: '2026-01-14',
-        uploadedBy: 'Adv. Rajesh Sharma',
-        fileCategory: 'Vakalatnama',
-        isRestricted: true,
-        documentHash: 'sha256:cb8379ac2098aa165029e3938bda5f974afc0b60d4e167380f9a0e599f96f04e',
-        pageCount: 3,
-        summary: 'Duly executed Vakalatnama authorizing Adv. Rajesh Sharma to appear and plead before Delhi High Court.'
-      },
-      {
-        id: 'doc_03',
-        title: 'Confidential Electronic Server Log Audit & SLA Breach Telemetry',
-        fileName: 'Forensic_Telemetry_Evidence_Exhibit_C.pdf',
-        fileType: 'pdf',
-        fileSize: '18.4 MB',
-        uploadedAt: '2026-03-10',
+        fileSize: '1.9 MB',
+        uploadedAt: '2026-02-18',
         uploadedBy: 'Adv. Rajesh Sharma',
         fileCategory: 'Evidence',
-        isRestricted: true, // RESTRICTED FILE RULE: Only verified lawyer can view
-        documentHash: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        pageCount: 118,
-        summary: 'Forensic AWS & GCP server cluster latency logs, timestamped packet drop proof, and Certificate under Section 65B of Indian Evidence Act.'
-      },
-      {
-        id: 'doc_04',
-        title: 'Written Statement & Counter-Denial by Respondent',
-        fileName: 'Written_Statement_Apex_Horizon.pdf',
-        fileType: 'pdf',
-        fileSize: '6.1 MB',
-        uploadedAt: '2026-04-20',
-        uploadedBy: 'Court Registry / Respondent',
-        fileCategory: 'Court Order',
         isRestricted: true,
-        documentHash: 'sha256:ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
-        pageCount: 38,
-        summary: 'Respondent claims force majeure and external ISP fiber cut as mitigation against liquidated damages.'
+        documentHash: 'sha256:bf5804369a489111ff46efaa0313f0efb0e0081d6f2fd42cbceefc225a07c134',
+        pageCount: 14,
+        summary: 'Certified server communication logs and electronic ledger records.'
       }
     ]
   },
   {
-    id: 'case_property_dispute_02',
-    caseNumber: 'OS/BLR/2025/1184',
-    cnrNumber: 'KABC02-001184-2025',
-    title: 'Greenland Infrastructures vs. Karnataka Urban Land Authority',
-    caseType: 'Civil & Property',
-    filingDate: '2025-08-19',
-    courtName: 'City Civil Court Bengaluru (Special Land Tribunal)',
-    jurisdiction: 'Bengaluru, Karnataka',
-    bench: 'Principal City Civil Judge Bench 7',
-    judgeName: 'Hon\'ble K. V. Sreedhar',
-    petitioner: 'Greenland Infrastructures (Rep. by Priya Nair)',
-    respondent: 'Karnataka Urban Land Authority & 3 Others',
-    clientId: 'client_priya', // BELONGS TO CLIENT PRIYA (Isolated from Rohan)
+    id: 'case_priya_1',
+    caseNumber: 'WRIT-PET/KA/2026/892',
+    cnrNumber: 'JB01-572910-2026',
+    title: 'Greenland Infrastructure vs. Bangalore Development Authority (BDA)',
+    caseType: 'Constitutional Writ',
+    filingDate: '2026-01-20',
+    courtName: 'High Court of Karnataka (Bengaluru Bench)',
+    jurisdiction: 'High Court Constitutional Writ Jurisdiction',
+    bench: 'Single Judge Division Bench',
+    judgeName: 'Hon\'ble Justice Raghavendra Rao',
+    petitioner: 'Priya Nair (Greenland Infra)',
+    respondent: 'Bangalore Development Authority (BDA)',
+    clientId: 'client_priya',
     clientName: 'Priya Nair',
     clientEmail: 'priya.nair@greenlandinfra.com',
-    assignedLawyerId: 'lawyer_meenakshi',
-    assignedLawyerName: 'Adv. Meenakshi Sundaram',
-    status: 'Arguments',
-    stageDescription: 'Final Hearing on Injunction & Boundary Demarcation Title Survey Report',
-    daysElapsed: 220,
-    estimatedDisposalDays: 270,
-    delayRiskScore: 'Moderate',
-    delayDays: 34,
-    bottleneckReason: 'Revenue surveyor took 4 adjournments to submit GIS topographical contour verification map.',
-    nextHearingDate: '2026-09-28',
-    summaryBrief: 'Title Declaration and Permanent Injunction Suit for 4.8 Acres Commercial Tech Park Land in Whitefield, Bangalore.',
-    hearings: [
-      {
-        id: 'hp_01',
-        hearingDate: '2025-09-10',
-        courtRoom: 'Court Hall 7, Mayo Hall, Bengaluru',
-        judgeName: 'Hon\'ble K. V. Sreedhar',
-        stage: 'Preliminary Notice',
-        purpose: 'Ad-interim Ex-parte Status Quo Order',
-        notes: 'Status quo granted in favor of Petitioner Greenland Infra.',
-        status: 'Completed'
-      },
-      {
-        id: 'hp_02',
-        hearingDate: '2026-03-24',
-        courtRoom: 'Court Hall 7, Mayo Hall, Bengaluru',
-        judgeName: 'Hon\'ble K. V. Sreedhar',
-        stage: 'Survey Commissioner Report Filing',
-        purpose: 'Marking of Certified Boundary Demarcation Blueprint',
-        notes: 'Commissioner report marked as Exhibit P-14.',
-        status: 'Completed'
-      },
-      {
-        id: 'hp_03',
-        hearingDate: '2026-09-28',
-        courtRoom: 'Court Hall 7, Mayo Hall, Bengaluru',
-        judgeName: 'Hon\'ble K. V. Sreedhar',
-        stage: 'Arguments',
-        purpose: 'Final arguments on title confirmation and revenue khata transfer',
-        status: 'Scheduled'
-      }
-    ],
-    documents: [
-      {
-        id: 'doc_p1',
-        title: 'Original Title Deed & Mother Deed 1974',
-        fileName: 'MotherDeed_Survey72_Whitefield_1974.pdf',
-        fileType: 'pdf',
-        fileSize: '9.4 MB',
-        uploadedAt: '2025-08-19',
-        uploadedBy: 'Adv. Meenakshi Sundaram',
-        fileCategory: 'Evidence',
-        isRestricted: true,
-        documentHash: 'sha256:11a8a230f9e7742f39423ac646ff61c0c185c5f840e754b29b242860b5ab7b1a',
-        pageCount: 64,
-        summary: 'Certified registered chain of title deeds establishing continuous uninterrupted ownership since 1974.'
-      },
-      {
-        id: 'doc_p2',
-        title: 'Court Commissioner Topographical Survey Report',
-        fileName: 'Court_Commissioner_Survey_Report_Whitefield.pdf',
-        fileType: 'pdf',
-        fileSize: '14.2 MB',
-        uploadedAt: '2026-03-24',
-        uploadedBy: 'Court Appointed Commissioner',
-        fileCategory: 'Court Order',
-        isRestricted: true,
-        documentHash: 'sha256:22b9c340f8e8853f40534bd757ff72d1d296d6f951e865c30c353971c6bc8c2b',
-        pageCount: 52,
-        summary: 'High-resolution Drone GIS Survey verifying exact boundaries and unencumbered possession.'
-      }
-    ]
-  },
-  {
-    id: 'case_constitutional_writ_03',
-    caseNumber: 'WP(C)/SC/2026/0992',
-    cnrNumber: 'SCIN01-000992-2026',
-    title: 'Federation of Online Developers vs. Union of India & Anr.',
-    caseType: 'Constitutional Writ',
-    filingDate: '2026-02-28',
-    courtName: 'Supreme Court of India',
-    jurisdiction: 'New Delhi',
-    bench: 'Hon\'ble Chief Justice of India Courtroom 1',
-    judgeName: 'Hon\'ble The Chief Justice of India',
-    petitioner: 'Federation of Online Developers (Public Interest Action)',
-    respondent: 'Union of India (Ministry of Electronics & IT) & Anr.',
-    clientId: 'client_rohan', // ALSO ASSOCIATED TO ROHAN'S FOUNDER FEDERATION
-    clientName: 'Rohan Verma',
-    clientEmail: 'rohan.verma@techscale.io',
-    assignedLawyerId: 'lawyer_rajesh',
-    assignedLawyerName: 'Adv. Rajesh Sharma',
+    assignedLawyerId: 'lawyer_vikram',
+    assignedLawyerName: 'Adv. Vikramaditya Rao',
     status: 'Notice',
-    stageDescription: 'Formal Notice Issued to Solicitor General of India regarding statutory compliance burden',
-    daysElapsed: 46,
-    estimatedDisposalDays: 180,
-    delayRiskScore: 'Low',
-    delayDays: 0,
-    nextHearingDate: '2026-10-04',
-    summaryBrief: 'Article 32 Writ challenging ambiguity in algorithmic compliance provisions and seeking fast-track dispute mechanisms.',
+    stageDescription: 'Notice Issued to Respondent Authority with Status Quo Order',
+    daysElapsed: 55,
+    estimatedDisposalDays: 140,
+    delayRiskScore: 'Moderate',
+    delayDays: 14,
+    bottleneckReason: 'Waiting for BDA compliance report on road widening survey map.',
+    nextHearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0],
     hearings: [
       {
-        id: 'hw_01',
-        hearingDate: '2026-03-15',
-        courtRoom: 'Court 1, Supreme Court of India',
-        judgeName: 'Hon\'ble Chief Justice of India',
-        stage: 'Admission',
-        purpose: 'Writ admission and preliminary hearing on interim relief',
-        notes: 'Notice issued returnable in 4 weeks. No coercive action directed.',
-        status: 'Completed'
-      },
-      {
-        id: 'hw_02',
-        hearingDate: '2026-10-04',
-        courtRoom: 'Court 1, Supreme Court of India',
-        judgeName: 'Hon\'ble Chief Justice of India',
-        stage: 'Notice',
-        purpose: 'Union of India Counter-Affidavit Submission',
+        id: 'h_201',
+        hearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0],
+        courtRoom: 'Court Hall 2, Karnataka High Court',
+        judgeName: 'Hon\'ble Justice Raghavendra Rao',
+        stage: 'Respondent Compliance Review',
+        purpose: 'Review of BDA survey status report',
         status: 'Scheduled'
       }
     ],
     documents: [
       {
-        id: 'doc_w1',
-        title: 'Article 32 Writ Petition & Constitutional Grounds',
-        fileName: 'Writ_Petition_Civil_SC_2026.pdf',
+        id: 'doc_201',
+        title: 'Article 226 Constitutional Writ Petition',
+        fileName: 'Writ_Petition_Greenland_v_BDA.pdf',
         fileType: 'pdf',
-        fileSize: '5.6 MB',
-        uploadedAt: '2026-02-28',
-        uploadedBy: 'Adv. Rajesh Sharma',
+        fileSize: '6.2 MB',
+        uploadedAt: '2026-01-20',
+        uploadedBy: 'Adv. Vikramaditya Rao',
         fileCategory: 'Petition',
         isRestricted: true,
-        documentHash: 'sha256:33c0d451f9f9964f51645ce868ff83e2e307e70a62f976d41d464a82d7cd9d3c',
-        pageCount: 78,
-        summary: 'Comprehensive legal brief detailing constitutional arguments under Articles 14, 19(1)(g), and 21.'
+        documentHash: 'sha256:d8578edf8458ce06fbc5bb76a58c5ca4',
+        pageCount: 62,
+        summary: 'Writ challenging unnotified setback acquisition without statutory compensation.'
       }
     ]
   }
@@ -596,6 +659,17 @@ app.post('/api/auth/register', (req, res) => {
       bio: newUser.bio || 'Practicing advocate registered on JusticeBridge.',
       casesResolved: 0,
       activeCasesCount: 0,
+      casesTotal: 0,
+      casesWon: 0,
+      casesLost: 0,
+      casesCompromised: 0,
+      casesOngoing: 0,
+      winRate: 0,
+      compromiseRate: 0,
+      grade: 'B',
+      tierTitle: 'Junior Associate Counsel',
+      badges: ['Newly Registered Advocate'],
+      reviews: [],
       contactEmail: newUser.email,
       phone: newUser.phone || '+91 98000 00000',
       availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
@@ -672,9 +746,9 @@ app.post('/api/lawyers/verify', (req, res) => {
   });
 });
 
-// 3. Lawyers Directory & Search with Advanced Filtering
+// 3. Lawyers Directory & Search with Advanced Filtering and Grading Index
 app.get('/api/lawyers', (req, res) => {
-  const { query, specialization, verifiedOnly, court, maxFee, minExp, minRating, sortBy } = req.query;
+  const { query, specialization, verifiedOnly, court, maxFee, minExp, minRating, grade, sortBy } = req.query;
   let results = [...lawyersDirectory];
 
   if (query && typeof query === 'string') {
@@ -684,12 +758,17 @@ app.get('/api/lawyers', (req, res) => {
       l.location.toLowerCase().includes(q) ||
       l.specialization.some(s => s.toLowerCase().includes(q)) ||
       l.courts.some(c => c.toLowerCase().includes(q)) ||
-      (l.barCouncilNumber && l.barCouncilNumber.toLowerCase().includes(q))
+      (l.barCouncilNumber && l.barCouncilNumber.toLowerCase().includes(q)) ||
+      (l.badges && l.badges.some(b => b.toLowerCase().includes(q)))
     );
   }
 
   if (specialization && typeof specialization === 'string' && specialization !== 'All') {
     results = results.filter(l => l.specialization.includes(specialization));
+  }
+
+  if (grade && typeof grade === 'string' && grade !== 'All') {
+    results = results.filter(l => l.grade === grade);
   }
 
   if (verifiedOnly === 'true') {
@@ -715,6 +794,15 @@ app.get('/api/lawyers', (req, res) => {
   // Sorting
   if (sortBy === 'rating') {
     results.sort((a, b) => b.rating - a.rating);
+  } else if (sortBy === 'grade') {
+    const gradeWeight = { 'A+': 4, 'A': 3, 'B+': 2, 'B': 1 };
+    results.sort((a, b) => (gradeWeight[b.grade] || 0) - (gradeWeight[a.grade] || 0) || b.winRate - a.winRate);
+  } else if (sortBy === 'win_rate') {
+    results.sort((a, b) => (b.winRate || 0) - (a.winRate || 0));
+  } else if (sortBy === 'cases_compromised') {
+    results.sort((a, b) => (b.casesCompromised || 0) - (a.casesCompromised || 0));
+  } else if (sortBy === 'cases_total') {
+    results.sort((a, b) => (b.casesTotal || 0) - (a.casesTotal || 0));
   } else if (sortBy === 'experience') {
     results.sort((a, b) => b.experienceYears - a.experienceYears);
   } else if (sortBy === 'fee_asc') {
@@ -722,10 +810,99 @@ app.get('/api/lawyers', (req, res) => {
   } else if (sortBy === 'fee_desc') {
     results.sort((a, b) => b.consultationFee - a.consultationFee);
   } else if (sortBy === 'cases_won') {
-    results.sort((a, b) => b.casesResolved - a.casesResolved);
+    results.sort((a, b) => (b.casesWon || b.casesResolved) - (a.casesWon || a.casesResolved));
   }
 
   res.json({ lawyers: results, total: results.length });
+});
+
+// Single Lawyer Detail & Performance Dossier
+app.get('/api/lawyers/:id', (req, res) => {
+  const { id } = req.params;
+  const lawyer = lawyersDirectory.find(l => l.id === id);
+  if (!lawyer) {
+    return res.status(404).json({ error: 'Advocate profile not found in directory.' });
+  }
+  res.json({ lawyer });
+});
+
+// Submit Client Review & Update Advocate Performance Statistics
+app.post('/api/lawyers/:id/reviews', (req, res) => {
+  const { id } = req.params;
+  const user = users[currentUserId] || users['client_rohan'];
+  const { rating, caseType, caseOutcome, comment, courtName } = req.body;
+
+  const lawyer = lawyersDirectory.find(l => l.id === id);
+  if (!lawyer) {
+    return res.status(404).json({ error: 'Lawyer not found' });
+  }
+
+  const numRating = Math.min(5, Math.max(1, Number(rating) || 5));
+  const newReview: LawyerReview = {
+    id: `rev_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`,
+    lawyerId: lawyer.id,
+    clientId: user.id,
+    clientName: user.name,
+    clientAvatar: user.avatar,
+    rating: numRating,
+    caseType: caseType || 'Commercial Dispute',
+    caseOutcome: (caseOutcome as any) || 'Won',
+    comment: comment || 'Professional and highly diligent legal advocacy.',
+    courtName: courtName || lawyer.courts[0] || 'High Court of Delhi',
+    verifiedLitigant: user.role === 'client',
+    createdAt: new Date().toISOString().split('T')[0]
+  };
+
+  if (!lawyer.reviews) {
+    lawyer.reviews = [];
+  }
+  lawyer.reviews.unshift(newReview);
+
+  // Recalculate average rating & reviews count
+  const allRatings = lawyer.reviews.map(r => r.rating);
+  const avgRating = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+  lawyer.rating = Math.round(avgRating * 10) / 10;
+  lawyer.reviewsCount = lawyer.reviews.length;
+
+  // Increment outcome counters if requested
+  if (caseOutcome === 'Won') {
+    lawyer.casesWon = (lawyer.casesWon || 0) + 1;
+    lawyer.casesTotal = (lawyer.casesTotal || 0) + 1;
+    lawyer.casesResolved = (lawyer.casesResolved || 0) + 1;
+  } else if (caseOutcome === 'Compromised') {
+    lawyer.casesCompromised = (lawyer.casesCompromised || 0) + 1;
+    lawyer.casesTotal = (lawyer.casesTotal || 0) + 1;
+    lawyer.casesResolved = (lawyer.casesResolved || 0) + 1;
+  } else if (caseOutcome === 'Lost') {
+    lawyer.casesLost = (lawyer.casesLost || 0) + 1;
+    lawyer.casesTotal = (lawyer.casesTotal || 0) + 1;
+    lawyer.casesResolved = (lawyer.casesResolved || 0) + 1;
+  } else if (caseOutcome === 'Ongoing') {
+    lawyer.casesOngoing = (lawyer.casesOngoing || 0) + 1;
+    lawyer.casesTotal = (lawyer.casesTotal || 0) + 1;
+  }
+
+  // Recalculate winRate and compromiseRate
+  if (lawyer.casesTotal > 0) {
+    lawyer.winRate = Math.round(((lawyer.casesWon || 0) / lawyer.casesTotal) * 1000) / 10;
+    lawyer.compromiseRate = Math.round(((lawyer.casesCompromised || 0) / lawyer.casesTotal) * 1000) / 10;
+  }
+
+  // Update grade dynamically if performance meets criteria
+  if (lawyer.winRate >= 75 && lawyer.rating >= 4.8) {
+    lawyer.grade = 'A+';
+  } else if (lawyer.winRate >= 65 && lawyer.rating >= 4.5) {
+    lawyer.grade = 'A';
+  } else if (lawyer.winRate >= 55) {
+    lawyer.grade = 'B+';
+  }
+
+  res.status(201).json({
+    success: true,
+    message: 'Client review and case outcome recorded successfully!',
+    review: newReview,
+    updatedLawyer: lawyer
+  });
 });
 
 // Consultations Bookings API
@@ -1003,7 +1180,7 @@ app.post('/api/cases/file', (req, res) => {
     return res.status(400).json({ error: 'Missing required case filing fields.' });
   }
 
-  const lawyer = lawyersDirectory.find(l => l.id === assignedLawyerId) || lawyersDirectory[0];
+  const lawyer = lawyersDirectory.find(l => l.id === assignedLawyerId) || (lawyersDirectory.length > 0 ? lawyersDirectory[0] : null);
   const newCaseId = `case_${Date.now()}`;
   const randomCnrSuffix = Math.floor(100000 + Math.random() * 900000);
   const randomCaseNum = Math.floor(100 + Math.random() * 900);
@@ -1024,8 +1201,8 @@ app.post('/api/cases/file', (req, res) => {
     clientId: user.role === 'client' ? user.id : 'client_rohan', // Bound strictly to client
     clientName: user.name,
     clientEmail: user.email,
-    assignedLawyerId: lawyer.id,
-    assignedLawyerName: lawyer.name,
+    assignedLawyerId: lawyer ? lawyer.id : 'unassigned',
+    assignedLawyerName: lawyer ? lawyer.name : 'Awaiting Advocate Assignment',
     status: 'Filing',
     stageDescription: 'Initial E-filing Scrutiny & Registry Stamp Verification',
     daysElapsed: 1,
@@ -1156,7 +1333,7 @@ app.get('/api/membership/status', (req, res) => {
 });
 
 // Checkout initiation
-app.post('/api/membership/checkout', (req, res) => {
+app.post('/api/membership/checkout', async (req, res) => {
   const user = users[currentUserId] || users['client_rohan'];
   const { paymentMethod } = req.body;
 
@@ -1165,10 +1342,33 @@ app.post('/api/membership/checkout', (req, res) => {
   const baseAmount = Math.round((rawFee / 1.18) * 100) / 100;
   const gstAmount = Math.round((rawFee - baseAmount) * 100) / 100;
 
-  const orderId = `JB_ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  const internalOrderId = `JB_ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  let razorpayOrderId = internalOrderId;
+
+  try {
+    const razorpay = getRazorpayClient();
+    const rzpOrder = await razorpay.orders.create({
+      amount: rawFee * 100, // amount in paise
+      currency: 'INR',
+      receipt: internalOrderId,
+      notes: {
+        userId: user.id,
+        userName: user.name,
+        role: user.role,
+        plan: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass'
+      }
+    });
+    if (rzpOrder && rzpOrder.id) {
+      razorpayOrderId = rzpOrder.id;
+    }
+  } catch (error) {
+    console.warn('Razorpay order creation fallback:', error);
+  }
 
   res.json({
-    orderId,
+    orderId: internalOrderId,
+    razorpayOrderId,
+    razorpayKeyId: RAZORPAY_KEY_ID,
     planId: isLawyer ? 'advocate_monthly' : 'client_annual',
     planName: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass',
     planDuration: isLawyer ? '1 Month (30 Days)' : '1 Year (365 Days)',
@@ -1188,7 +1388,25 @@ app.post('/api/membership/checkout', (req, res) => {
 // Verify & Activate Membership Payment
 app.post('/api/membership/verify-payment', (req, res) => {
   const user = users[currentUserId] || users['client_rohan'];
-  const { orderId, paymentMethod, transactionId } = req.body;
+  const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+
+  // If Razorpay signature is provided, verify authenticity
+  let signatureVerified = true;
+  if (razorpay_signature && razorpay_payment_id && razorpay_order_id) {
+    try {
+      const generatedSignature = crypto
+        .createHmac('sha256', RAZORPAY_KEY_SECRET)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+      signatureVerified = generatedSignature === razorpay_signature;
+      if (!signatureVerified) {
+        return res.status(400).json({ error: 'Invalid Razorpay payment signature.' });
+      }
+    } catch (sigErr) {
+      console.warn('Signature verification check error:', sigErr);
+    }
+  }
 
   const isLawyer = user.role === 'lawyer';
   const totalAmount = isLawyer ? 3999 : 2999;
@@ -1208,7 +1426,7 @@ app.post('/api/membership/verify-payment', (req, res) => {
   user.membershipPlan = isLawyer ? 'advocate_monthly' : 'client_annual';
   user.membershipExpiresAt = expiresAtDate.toISOString();
 
-  const txnId = transactionId || `TXN_${paymentMethod || 'UPI'}_${Date.now()}`;
+  const txnId = razorpay_payment_id || transactionId || `TXN_${paymentMethod || 'UPI'}_${Date.now()}`;
   const invNumber = `JB-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const newInvoice: PaymentInvoice = {
@@ -1224,7 +1442,7 @@ app.post('/api/membership/verify-payment', (req, res) => {
     totalAmount: totalAmount,
     currency: 'INR',
     status: 'Paid',
-    paymentMethod: paymentMethod || 'UPI (Fast Pay)',
+    paymentMethod: razorpay_payment_id ? 'Razorpay Live Gateway (UPI/Cards/Netbanking)' : (paymentMethod || 'UPI (Fast Pay)'),
     transactionId: txnId,
     paidAt: now.toISOString(),
     expiresAt: expiresAtDate.toISOString()
@@ -1292,25 +1510,28 @@ Provide a high-impact, actionable 3-point strategy to expedite this hearing, eli
   });
 });
 
-// 6. Interactive AI Legal Assistant Chat
+// 6. Interactive AI Legal Assistant Chat with Multilingual Support
 app.post('/api/ai/legal-chat', async (req, res) => {
-  const { query } = req.body;
+  const { query, language, langName } = req.body;
 
   if (!query) {
     return res.status(400).json({ error: 'Query is required' });
   }
 
+  const targetLang = langName || (language === 'te' ? 'Telugu' : language === 'hi' ? 'Hindi' : language === 'ta' ? 'Tamil' : 'English');
+
   try {
     const ai = getAIClient();
     if (ai) {
       const systemInstruction = `You are JusticeBridge's expert Indian Legal AI Counsel.
-You specialize in Indian Law, the Constitution of India, Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), Civil Procedure Code (CPC), Commercial Courts Act, NI Act, and High Court / Supreme Court procedural rules.
+You specialize in Indian Law, Constitution of India, Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), Civil Procedure Code (CPC), Commercial Courts Act, NI Act, and High Court / Supreme Court procedural rules.
+Respond comprehensively in the user's requested language: "${targetLang}" (along with English legal section citations).
 Always structure responses clearly with:
-1. **Applicable Legal Provisions & Sections**
+1. **Applicable Legal Provisions & Sections (లా సెక్షన్లు / कानूनी धाराएं)**
 2. **Procedural Requirements & Mandatory Notices**
 3. **Strategic Next Steps & Timelines**
-4. **Actionable Checklist for the Client or Advocate**
-Maintain professional, concise, authoritative, and accessible legal drafting language.`;
+4. **Actionable Checklist for the Litigant or Advocate**
+Maintain empathetic, accessible, authoritative, and practical advice suited for both ordinary citizens and lawyers.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -1322,7 +1543,7 @@ Maintain professional, concise, authoritative, and accessible legal drafting lan
 
       return res.json({
         reply: response.text,
-        model: 'Gemini 2.5 Flash Judicial AI'
+        model: 'Gemini 2.5 Flash Multilingual Judicial AI'
       });
     }
   } catch (error) {
@@ -1332,21 +1553,169 @@ Maintain professional, concise, authoritative, and accessible legal drafting lan
   // Fallback intelligent response
   res.json({
     reply: `### Legal Strategy & Statutory Review:
-1. **Statutory Framework**: For "${query.slice(0, 80)}...", Indian law stipulates strict adherence to pre-institution mediation (Commercial Courts Act Sec 12A) or statutory notice periods (Sec 80 CPC / Sec 138 NI Act).
-2. **Documentary Evidence**: Collate certified digital logs, stamp duty verified agreements, and Sec 65B electronic evidence certificates.
-3. **Immediate Action**: Generate a formal Demand Notice via the **Legal Docs** tab and consult a Bar Council verified advocate to file an urgent Caveat or Interim Injunction.`,
+1. **Statutory Framework**: For "${query.slice(0, 80)}...", Indian law stipulates strict adherence to pre-institution mediation or statutory notice periods (Sec 80 CPC / Sec 138 NI Act / BNS).
+2. **Documentary Evidence**: Collate certified digital logs, stamp duty verified agreements, and witness statements.
+3. **Immediate Action**: Generate a formal Demand Notice and consult a Bar Council verified advocate to file an urgent Caveat or Interim Petition.`,
     model: 'JusticeBridge Statutory AI Engine'
   });
 });
 
-// Platform Statistics
-app.get('/api/analytics', (req, res) => {
+// 7. Voice Case Filing Engine (For Illiterate / Rural / Multi-lingual Citizens)
+app.post('/api/ai/voice-file-case', async (req, res) => {
+  const user = users[currentUserId] || users['client_rohan'];
+  const { voiceTranscript, languageCode, languageName, autoFile } = req.body;
+
+  if (!voiceTranscript) {
+    return res.status(400).json({ error: 'Voice transcript is required' });
+  }
+
+  let extractedData = {
+    title: 'Litigation Petition: ' + voiceTranscript.slice(0, 50),
+    caseType: 'Civil & Property',
+    courtName: 'High Court of Delhi (Commercial Division)',
+    respondent: 'Opposing Party (As identified in testimony)',
+    summaryBrief: voiceTranscript,
+    legalSections: ['Section 9 CPC', 'Specific Relief Act', 'Bharatiya Nyaya Sanhita'],
+    reliefSought: 'Restoration of lawful possession and interim injunction against unlawful interference.',
+    keyFacts: [
+      'Grievance narrated via vernacular voice assistant.',
+      'Unlawful interference / dispute reported by petitioner.',
+      'Urgent judicial intervention prayed for.'
+    ],
+    spokenSummaryInNativeLang: `మీరు చెప్పిన వివరాల ఆధారంగా కేసు ప్రాథమిక ముసాయిదా సిద్ధమైంది.`
+  };
+
+  try {
+    const ai = getAIClient();
+    if (ai) {
+      const extractionPrompt = `You are a Senior Judicial Registrar in India helping illiterate and non-tech-savvy citizens file real court cases by listening to their spoken words.
+The citizen spoke in "${languageName || 'Indian vernacular'}":
+"""
+${voiceTranscript}
+"""
+
+Extract and formulate a complete, legally sound case petition structure in JSON format:
+{
+  "title": "Concise formal case title e.g. [Petitioner Name] vs. [Respondent Name / Entity]",
+  "caseType": "One of ['Civil & Property', 'Commercial Dispute', 'Constitutional Writ', 'Cyber Crime', 'Criminal Defense', 'Corporate Arbitration', 'Family Law']",
+  "courtName": "Appropriate Indian court e.g. 'High Court of Delhi', 'District & Sessions Court, Hyderabad', 'City Civil Court, Bengaluru', 'High Court of Judicature at Bombay', etc.",
+  "respondent": "Name or designation of opposing party/wrongdoer identified in speech",
+  "summaryBrief": "A well-drafted legal factual narrative of what happened and cause of action",
+  "legalSections": ["List of 2-4 applicable Indian laws/sections e.g. 'Sec 447 IPC (Criminal Trespass)', 'BNS Sec 329', 'Sec 138 NI Act', 'Sec 38 Specific Relief Act', etc."],
+  "reliefSought": "Exact legal prayer/injunction/damages requested",
+  "keyFacts": ["Fact 1", "Fact 2", "Fact 3"],
+  "spokenSummaryInNativeLang": "A simple, reassuring 2-sentence summary spoken in ${languageName || 'their native language'} explaining what was filed and that their case is registered."
+}
+
+Output only valid JSON.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: extractionPrompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      if (response.text) {
+        try {
+          const parsed = JSON.parse(response.text);
+          extractedData = { ...extractedData, ...parsed };
+        } catch (parseErr) {
+          console.warn('JSON parsing fallback for voice case:', parseErr);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Gemini Voice Case Filer API error:', error);
+  }
+
+  // If autoFile is true or requested, register directly into casesStore
+  let registeredCase: CaseMatter | null = null;
+  if (autoFile !== false) {
+    const randomCnrSuffix = Math.floor(100000 + Math.random() * 900000);
+    const randomCaseNum = Math.floor(100 + Math.random() * 900);
+    const newCaseId = `case_voice_${Date.now()}`;
+
+    registeredCase = {
+      id: newCaseId,
+      caseNumber: `VOICE-PET/${new Date().getFullYear()}/${randomCaseNum}`,
+      cnrNumber: `JB01-${randomCnrSuffix}-${new Date().getFullYear()}`,
+      title: extractedData.title,
+      caseType: (extractedData.caseType as any) || 'Civil & Property',
+      filingDate: new Date().toISOString().split('T')[0],
+      courtName: extractedData.courtName,
+      jurisdiction: 'District / High Court Jurisdiction',
+      bench: 'Single Judge Roster Bench',
+      judgeName: 'Hon\'ble Presiding Judge',
+      petitioner: `${user.name} (Litigant Petitioner)`,
+      respondent: extractedData.respondent,
+      clientId: user.role === 'client' ? user.id : 'client_rohan',
+      clientName: user.name,
+      clientEmail: user.email,
+      assignedLawyerId: 'unassigned',
+      assignedLawyerName: 'Awaiting Advocate Verification & Retainer',
+      status: 'Filing',
+      stageDescription: 'E-Filed via Voice Judicial Assistant (Vernacular Voice Intake Verified)',
+      daysElapsed: 1,
+      estimatedDisposalDays: 120,
+      delayRiskScore: 'Low',
+      delayDays: 0,
+      summaryBrief: `${extractedData.summaryBrief}\n\nApplicable Statutes: ${extractedData.legalSections.join(', ')}\nRelief Sought: ${extractedData.reliefSought}`,
+      nextHearingDate: new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      hearings: [
+        {
+          id: `h_v_${Date.now()}`,
+          hearingDate: new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString().split('T')[0],
+          courtRoom: 'Virtual Scrutiny Chamber / E-Filing Registry',
+          judgeName: 'Registrar (Judicial)',
+          stage: 'Filing Scrutiny & Advocate Assignment',
+          purpose: 'Verification of spoken facts, caveat clearance, and cause list enrollment',
+          status: 'Scheduled'
+        }
+      ],
+      documents: [
+        {
+          id: `doc_v_${Date.now()}`,
+          title: `Voice-Assisted E-Filing Petition - ${extractedData.title}`,
+          fileName: `Vernacular_Voice_Petition_${Date.now()}.pdf`,
+          fileType: 'pdf',
+          fileSize: '2.8 MB',
+          uploadedAt: new Date().toISOString().split('T')[0],
+          uploadedBy: `${user.name} (AI Voice Assistant)`,
+          fileCategory: 'Petition',
+          isRestricted: true,
+          documentHash: `sha256:voice_${Math.random().toString(36).substring(2)}${Date.now()}`,
+          pageCount: 18,
+          summary: `Official court petition brief generated from citizen voice narrative. Relief sought: ${extractedData.reliefSought}`
+        }
+      ]
+    };
+
+    casesStore.unshift(registeredCase);
+  }
+
   res.json({
-    totalCasesRegistered: 18450,
-    verifiedAdvocatesCount: 1420,
-    averageDelayReductionDays: 84,
-    disposalRateImprovementPercent: 68.4,
-    activeHearingsTracked: 3290,
+    success: true,
+    message: 'Voice petition successfully structured and processed.',
+    extractedData,
+    registeredCase
+  });
+});
+
+// Platform Statistics (Dynamic calculation from live platform state)
+app.get('/api/analytics', (req, res) => {
+  const verifiedAdvocates = Object.values(users).filter(u => u.role === 'lawyer' && u.isVerifiedLawyer).length;
+  const totalRegisteredAdvocates = Object.values(users).filter(u => u.role === 'lawyer').length;
+  const totalCases = casesStore.length;
+  const activeHearings = casesStore.reduce((acc, c) => acc + (c.hearings ? c.hearings.length : 0), 0);
+
+  res.json({
+    totalCasesRegistered: totalCases,
+    verifiedAdvocatesCount: verifiedAdvocates || totalRegisteredAdvocates,
+    activeHearingsTracked: activeHearings,
+    averageDelayReductionDays: totalCases > 0 ? 84 : 0,
+    disposalRateImprovementPercent: totalCases > 0 ? 68.4 : 0,
     metrics: [
       { category: 'Commercial Suits', avgStandardDays: 480, justiceBridgeAvgDays: 165, reductionPercentage: 65 },
       { category: 'Constitutional Writs', avgStandardDays: 320, justiceBridgeAvgDays: 110, reductionPercentage: 66 },

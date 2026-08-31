@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, AlertTriangle, FileText, Plus, Upload, Clock, Calendar, CheckCircle2, ChevronRight, Eye, Sparkles, Scale, AlertCircle, ArrowUpRight, FileSpreadsheet, User, RefreshCw } from 'lucide-react';
 import { CaseMatter, User as UserType, CaseDocument } from '../types';
+import { getTranslation } from '../languages';
 
 interface MyCasesDashboardProps {
   currentUser: UserType;
@@ -8,6 +9,8 @@ interface MyCasesDashboardProps {
   onFileNewCase: () => void;
   onOpenVerifyModal: () => void;
   onOpenPaymentModal: () => void;
+  onOpenVoiceCaseFiler?: () => void;
+  currentLanguage?: string;
 }
 
 export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
@@ -16,7 +19,10 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
   onFileNewCase,
   onOpenVerifyModal,
   onOpenPaymentModal,
+  onOpenVoiceCaseFiler,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [cases, setCases] = useState<CaseMatter[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isolationMode, setIsolationMode] = useState<string>('');
@@ -75,7 +81,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-red-400">
-                  {currentUser.role === 'client' ? 'Rule 2: Client Isolation Enforced' : 'Rule 1: Verified Advocate Access Control'}
+                  {currentUser.role === 'client' ? t('rule2BannerClient') : t('rule1BannerLawyer')}
                 </span>
                 <span className="px-2 py-0.2 rounded-full bg-zinc-950 text-[10px] text-slate-300 border border-zinc-800 font-mono">
                   Tenant: {currentUser.id}
@@ -84,38 +90,50 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                 {currentUser.role === 'client' ? (
                   <>
-                    Active workspace is isolated to <strong>{currentUser.name}</strong>. Zero-knowledge tenancy guarantees no other client or unauthorized party can query your confidential litigation.
+                    {t('rule2ClientDesc')}
                   </>
                 ) : currentUser.isVerifiedLawyer ? (
                   <>
-                    Logged in as <strong>{currentUser.name}</strong> (Bar Council ID: <span className="font-mono text-emerald-400">{currentUser.barCouncilNumber}</span>). Full case files and evidence discovery unlocked.
+                    Logged in as <strong>{currentUser.name}</strong> (Bar Council ID: <span className="font-mono text-emerald-400">{currentUser.barCouncilNumber}</span>). {t('rule1LawyerDesc')}
                   </>
                 ) : (
                   <>
-                    ⚠️ Logged in as <strong>{currentUser.name}</strong> (Verification In Progress). <strong>Rule 1 active:</strong> Case evidence vaults are locked until Bar Council e-KYC is approved.
+                    ⚠️ Logged in as <strong>{currentUser.name}</strong> (Verification In Progress). {t('rule1UnverifiedDesc')}
                   </>
                 )}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2.5 flex-shrink-0">
+          <div className="flex items-center space-x-2.5 flex-shrink-0 flex-wrap gap-2">
+            {onOpenVoiceCaseFiler && (
+              <button
+                id="btn-dashboard-voice-file"
+                onClick={onOpenVoiceCaseFiler}
+                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-red-800 to-red-900 hover:from-amber-500 text-white text-xs font-bold border border-amber-500/40 shadow-lg transition-all active:scale-95 cursor-pointer"
+                title="Speak to File Case (Illiterate & Multilingual Assistance)"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                <span>{t('btnVoiceCaseFiler')}</span>
+              </button>
+            )}
+
             {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer ? (
               <button
                 id="btn-trigger-bar-verify"
                 onClick={onOpenVerifyModal}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold rounded-xl shadow-md transition-colors"
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold rounded-xl shadow-md transition-colors cursor-pointer"
               >
-                Verify Bar License
+                {t('completeBarVerificationBtn')}
               </button>
             ) : (
               <button
                 id="btn-dashboard-file-petition"
                 onClick={onFileNewCase}
-                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold border border-red-700 shadow-md transition-all active:scale-95"
+                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold border border-red-700 shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>File New Petition</span>
+                <span>{t('btnFileNewPetition')}</span>
               </button>
             )}
           </div>
@@ -126,19 +144,19 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-cinzel">
-            {currentUser.role === 'lawyer' ? 'Assigned Case Matters & Cause List' : 'My Active Legal Matters'}
+            {currentUser.role === 'lawyer' ? t('myCasesTitleLawyer') : t('myCasesTitleClient')}
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
             {currentUser.role === 'lawyer'
-              ? 'Review pending filings, schedule hearings, and access verified evidence discovery.'
-              : 'Directly track your petitions, next hearing dates, and court notices.'}
+              ? t('myCasesSubtitleLawyer')
+              : t('myCasesSubtitleClient')}
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-400 font-medium">Total Cases:</span>
+          <span className="text-xs text-slate-400 font-medium">{t('totalCases')}:</span>
           <span className="px-2.5 py-1 rounded-lg bg-red-950 text-red-300 font-mono font-bold text-xs border border-red-800">
-            {cases.length} Matters
+            {cases.length} {t('mattersCount')}
           </span>
         </div>
       </div>
@@ -152,15 +170,15 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
       ) : cases.length === 0 ? (
         <div className="text-center py-16 p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800">
           <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-white mb-1">No Active Cases Filed Yet</h3>
+          <h3 className="text-lg font-bold text-white mb-1">{t('noActiveCasesYet')}</h3>
           <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto mb-5">
-            You currently have no registered litigation matters in your isolated workspace. File a new petition or consult a verified advocate to begin.
+            {t('noActiveCasesDesc')}
           </p>
           <button
             onClick={onFileNewCase}
-            className="px-5 py-2.5 bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 text-white text-xs font-bold rounded-xl border border-red-600 shadow-lg"
+            className="px-5 py-2.5 bg-gradient-to-r from-red-700 to-red-900 hover:from-red-600 text-white text-xs font-bold rounded-xl border border-red-600 shadow-lg cursor-pointer"
           >
-            File First Legal Petition
+            {t('btnFileFirstPetition')}
           </button>
         </div>
       ) : (

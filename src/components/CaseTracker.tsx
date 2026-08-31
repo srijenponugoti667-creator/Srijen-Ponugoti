@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Clock, Calendar, AlertTriangle, CheckCircle2, ChevronRight, FileText, Scale, Eye, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { CaseMatter, User } from '../types';
+import { getTranslation } from '../languages';
 
 interface CaseTrackerProps {
   currentUser: User;
   onSelectCase: (caseId: string) => void;
   onFileNewCaseClick: () => void;
+  currentLanguage?: string;
 }
 
 export const CaseTracker: React.FC<CaseTrackerProps> = ({
   currentUser,
   onSelectCase,
   onFileNewCaseClick,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -87,23 +91,23 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
         <div>
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-xs font-semibold mb-2">
             <Scale className="w-3.5 h-3.5 text-red-400" />
-            <span>National Judicial Case Registry & Delay Tracker</span>
+            <span>{t('caseTrackerBadge')}</span>
           </div>
           <h2 className="text-3xl font-extrabold text-white tracking-tight font-cinzel">
-            Find a Case Matter
+            {t('caseTrackerTitle')}
           </h2>
           <p className="text-slate-400 text-sm mt-1 max-w-2xl">
-            Lookup any High Court, Supreme Court, or District Tribunal proceeding by CNR number, filing party, or case ID. Track hearing timelines and delay risk scores.
+            {t('caseTrackerSubtitle')}
           </p>
         </div>
 
         <button
           id="btn-findcase-file-new"
           onClick={onFileNewCaseClick}
-          className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 hover:to-red-700 text-white font-bold text-xs sm:text-sm shadow-xl border border-red-500/40 transition-all active:scale-95"
+          className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 hover:to-red-700 text-white font-bold text-xs sm:text-sm shadow-xl border border-red-500/40 transition-all active:scale-95 cursor-pointer"
         >
           <FileText className="w-4 h-4 text-red-200" />
-          <span>File New Case Petition</span>
+          <span>{t('btnFileNewCasePetition')}</span>
         </button>
       </div>
 
@@ -119,7 +123,7 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
               id="search-case-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by CNR, Case ID, Petitioner..."
+              placeholder={t('searchCaseInputPlaceholder')}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-red-600 focus:ring-1 focus:ring-red-600 text-white placeholder-zinc-500 text-sm outline-none transition-colors font-mono"
             />
           </div>
@@ -132,9 +136,9 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
               onChange={(e) => setSelectedType(e.target.value)}
               className="w-full px-3.5 py-3 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-red-600 text-slate-200 text-sm outline-none"
             >
-              {caseTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t === 'All' ? 'All Case Categories' : t}
+              {caseTypes.map((tName) => (
+                <option key={tName} value={tName}>
+                  {tName === 'All' ? t('allCaseCategories') : tName}
                 </option>
               ))}
             </select>
@@ -150,7 +154,7 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
             >
               {courtsList.map((c) => (
                 <option key={c} value={c}>
-                  {c === 'All' ? 'All Courts' : c}
+                  {c === 'All' ? t('filterByCourt') : c}
                 </option>
               ))}
             </select>
@@ -164,37 +168,20 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
               onChange={(e) => setSelectedRisk(e.target.value)}
               className="w-full px-3.5 py-3 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-red-600 text-slate-200 text-sm outline-none"
             >
-              <option value="All">All Risk Levels</option>
-              <option value="Critical">Critical Delay ⚠️</option>
-              <option value="Moderate">Moderate Delay</option>
-              <option value="Low">Low / On Track ✓</option>
+              <option value="All">{t('allRiskLevels')}</option>
+              <option value="Critical">{t('criticalDelay')}</option>
+              <option value="Moderate">{t('moderateDelay')}</option>
+              <option value="Low">{t('lowDelay')}</option>
             </select>
           </div>
 
         </div>
 
-        {/* Secondary Row: Sorting & Preset Quick Searches */}
+        {/* Secondary Row: Sorting & Instructions */}
         <div className="mt-4 pt-3 border-t border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-400 font-medium">Quick CNR Lookups:</span>
-            <button
-              onClick={() => setSearchQuery('DLHC01-004192-2026')}
-              className="px-2.5 py-1 rounded bg-zinc-950 text-red-300 hover:bg-red-950 border border-red-900/60 font-mono text-[11px]"
-            >
-              DLHC01-004192-2026 (Commercial)
-            </button>
-            <button
-              onClick={() => setSearchQuery('KABC02-001184-2025')}
-              className="px-2.5 py-1 rounded bg-zinc-950 text-red-300 hover:bg-red-950 border border-red-900/60 font-mono text-[11px]"
-            >
-              KABC02-001184-2025 (Property)
-            </button>
-            <button
-              onClick={() => setSearchQuery('SCIN01-000992-2026')}
-              className="px-2.5 py-1 rounded bg-zinc-950 text-red-300 hover:bg-red-950 border border-red-900/60 font-mono text-[11px]"
-            >
-              SCIN01-000992-2026 (Supreme Court)
-            </button>
+            <span className="text-slate-400 font-medium">Judicial Registry Lookup:</span>
+            <span className="text-slate-500 font-mono text-[11px]">{t('judicialLookupDesc')}</span>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -205,9 +192,9 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
               onChange={(e) => setSortBy(e.target.value)}
               className="px-2.5 py-1 rounded bg-zinc-950 border border-zinc-800 text-slate-300 text-xs outline-none"
             >
-              <option value="delay_desc">Highest Delay Days</option>
-              <option value="filing_recent">Most Recent Filing</option>
-              <option value="next_hearing">Upcoming Hearing Date</option>
+              <option value="delay_desc">{t('sortByDelay')}</option>
+              <option value="filing_recent">{t('sortByRecent')}</option>
+              <option value="next_hearing">{t('sortByNextHearing')}</option>
             </select>
             <span className="text-slate-500 font-mono">({cases.length} Matters)</span>
           </div>
@@ -218,24 +205,36 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
       {loading ? (
         <div className="text-center py-16">
           <div className="w-10 h-10 border-4 border-red-700 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400 text-sm">Searching judicial cause lists and e-filing repositories...</p>
+          <p className="text-slate-400 text-sm">{t('searchingCauseLists')}</p>
         </div>
       ) : cases.length === 0 ? (
         <div className="text-center py-16 p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800">
-          <Scale className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-white mb-1">No Case Records Found</h3>
-          <p className="text-slate-400 text-sm max-w-md mx-auto mb-4">
-            No matching case was located with the provided CNR or search keywords.
+          <div className="w-16 h-16 rounded-full bg-red-950/40 border border-red-900/50 flex items-center justify-center mx-auto mb-4">
+            <Scale className="w-8 h-8 text-red-400" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-2">{t('noCasesFound')}</h3>
+          <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto mb-6">
+            {t('noCasesDesc')}
           </p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedType('All');
-            }}
-            className="px-4 py-2 bg-red-950 hover:bg-red-900 text-red-200 text-xs font-bold rounded-lg border border-red-800"
-          >
-            Clear Search
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={onFileNewCaseClick}
+              className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 text-white text-xs font-bold rounded-xl border border-red-600 shadow-lg cursor-pointer"
+            >
+              {t('btnFileNewCasePetition')}
+            </button>
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedType('All');
+                }}
+                className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-slate-300 text-xs rounded-xl cursor-pointer"
+              >
+                {t('clearSearchQuery')}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-6">

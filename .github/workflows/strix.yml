@@ -27,4 +27,3 @@ jobs:
         env:
           STRIX_LLM: "gemini/gemini-2.5-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-STRIX_LLM: "gemini/gemini-2.5-flash"

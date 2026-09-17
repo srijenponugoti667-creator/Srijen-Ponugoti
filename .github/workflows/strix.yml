@@ -16,7 +16,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Strix Full Penetration Test
-        uses: usestrix/strix-action@main
+      - name: Install Strix
+        run: |
+          curl -sSL https://strix.ai/install | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run Strix Penetration Test
+        run: |
+          strix -n -t ./
         env:
+          STRIX_LLM: "openai/gpt-4o"
+          LLM_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

@@ -25,6 +25,6 @@ jobs:
         run: |
           strix -n -t ./
         env:
-          STRIX_LLM: "gemini/gemini-3.8-flash"
+          STRIX_LLM: "gemini/gemini-3.5-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}

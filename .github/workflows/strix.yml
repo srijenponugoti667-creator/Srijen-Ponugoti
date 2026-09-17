@@ -23,6 +23,7 @@ jobs:
 
       - name: Run Strix Penetration Test
         run: |
-          strix -n -t ./ --model gemini/gemini-1.5-flash
+          strix -n -t ./
         env:
+          STRIX_LLM: "gemini/gemini-1.5-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

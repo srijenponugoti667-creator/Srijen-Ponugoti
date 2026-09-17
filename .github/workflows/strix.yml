@@ -1,0 +1,17 @@
+name: Strix AI Security Audit
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Strix Penetration Test
+        uses: usestrix/strix-action@main
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

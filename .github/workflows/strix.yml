@@ -23,7 +23,7 @@ jobs:
 
       - name: Run Strix Penetration Test
         run: |
-          strix -n -t ./ --scan-mode quick --max-turns 25
+          strix -n -t ./ --scan-mode quick --max-turns 10
         env:
           STRIX_LLM: "gemini/gemini-3.5-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

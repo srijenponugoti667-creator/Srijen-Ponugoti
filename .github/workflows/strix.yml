@@ -25,6 +25,6 @@ jobs:
         run: |
           strix -n -t ./ --scan-mode quick --max-turns 10
         env:
-          STRIX_LLM: "gemini/gemini-3.5-flash"
+          STRIX_LLM: "gemini/gemini-2.0-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}

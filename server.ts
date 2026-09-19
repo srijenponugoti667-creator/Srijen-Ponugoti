@@ -594,7 +594,13 @@ app.get('/api/auth/current-user', (req, res) => {
 
 app.post('/api/auth/switch-persona', (req, res) => {
   const { userId } = req.body;
-  if (!users[userId]) {
+  if (
+    typeof userId !== 'string' ||
+    userId === '__proto__' ||
+    userId === 'constructor' ||
+    userId === 'prototype' ||
+    !Object.prototype.hasOwnProperty.call(users, userId)
+  ) {
     return res.status(404).json({ error: 'Persona not found' });
   }
   currentUserId = userId;
@@ -1387,7 +1393,9 @@ app.post('/api/membership/checkout', async (req, res) => {
 
 // Verify & Activate Membership Payment
 app.post('/api/membership/verify-payment', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = Object.prototype.hasOwnProperty.call(users, currentUserId)
+    ? users[currentUserId]
+    : users['client_rohan'];
   const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
   // If Razorpay signature is provided, verify authenticity

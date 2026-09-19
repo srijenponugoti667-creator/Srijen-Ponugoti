@@ -204,7 +204,7 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
             </button>
           )}
 
-          {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer && (
+          {currentUser?.role === 'lawyer' && !currentUser?.isVerifiedLawyer && (
             <button
               onClick={onOpenVerifyModal}
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs shadow-lg transition-colors cursor-pointer"

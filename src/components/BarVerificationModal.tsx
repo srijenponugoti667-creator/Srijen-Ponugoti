@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, CheckCircle2, AlertCircle, FileCheck, Building, Sparkles, Lock } from 'lucide-react';
 import { User } from '../types';
+import { getTranslation } from '../languages';
 
 interface BarVerificationModalProps {
   currentUser: User;
   isOpen: boolean;
   onClose: () => void;
   onVerificationSuccess: (updatedUser: User) => void;
+  currentLanguage?: string;
 }
 
 export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
@@ -14,18 +16,20 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
   isOpen,
   onClose,
   onVerificationSuccess,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
+  if (!isOpen || !currentUser) return null;
+
   const [barNumber, setBarNumber] = useState<string>(
-    currentUser.barCouncilNumber?.replace(' (Verification In Progress)', '') || 'MH/9921/2023'
+    currentUser?.barCouncilNumber?.replace(' (Verification In Progress)', '') || 'MH/9921/2023'
   );
   const [stateBar, setStateBar] = useState<string>(
-    currentUser.stateBarCouncil || 'Bar Council of Maharashtra & Goa'
+    currentUser?.stateBarCouncil || 'Bar Council of Maharashtra & Goa'
   );
   const [yearOfEnrollment, setYearOfEnrollment] = useState<string>('2023');
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
-
-  if (!isOpen) return null;
 
   const stateBars = [
     'Bar Council of Delhi',

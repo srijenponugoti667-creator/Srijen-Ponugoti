@@ -26,22 +26,22 @@ interface ExtractedVoiceCase {
 
 const SAMPLE_VOICE_STORIES = [
   {
-    title: 'Land Encroachment (భూ ఆక్రమణ / जमीन विवाद)',
-    lang: 'te',
-    text: 'నా పేరు రోహన్. మా గ్రామంలోని 2 ఎకరాల వ్యవసాయ భూమిని పొరుగింటి వ్యక్తి సురేష్ అక్రమంగా ఆక్రమించి కంచె వేశాడు. నేను అడిగితే నన్ను, నా కుటుంబాన్ని చంపేస్తానని బెదిరిస్తున్నాడు. నాకు తక్షణ రక్షణ మరియు భూమి తిరిగి ఇప్పించాలి.'
+    title: 'Land Encroachment Case',
+    lang: 'en',
+    text: 'Neighbor illegally encroached on 2 acres of my agricultural land and erected a fence. He is threatening my family when questioned. Need immediate protection and land restoration.'
   },
   {
-    title: 'Cheque Bounce / Loan Fraud (చెక్కు బౌన్స్ / चेक बाउंस)',
-    lang: 'hi',
-    text: 'मैंने व्यापारिक साझेदार रमेश कुमार को ₹5,00,000 का सामान दिया था। उसने मुझे बैंक चेक दिया जो बाउंस हो गया। अब वह फोन नहीं उठा रहा और पैसे देने से मना कर रहा है। मुझे कानूनी नोटिस और कोर्ट केस दाखिल करना है।'
+    title: 'Cheque Bounce / Debt Dispute',
+    lang: 'en',
+    text: 'I supplied goods worth ₹5,00,000 to business partner Ramesh Kumar. The bank cheque he issued bounced due to insufficient funds. Need to file Section 138 notice.'
   },
   {
-    title: 'Unpaid Labour Wages (జీతాల బకాయిలు / मजदूरी का बकाया)',
-    lang: 'te',
-    text: 'నేను మరియు మరో ఐదుగురు కార్మికులు ఒక ప్రైవేట్ బిల్డర్ వద్ద 6 నెలలు పనిచేశాము. మాకు రావాల్సిన ₹1,80,000 జీతాన్ని ఇవ్వకుండా కాంట్రాక్టర్ పారిపోయాడు. మా కష్టార్జితం మాకు ఇప్పించండి.'
+    title: 'Land Encroachment (Malayalam / മലയാളം)',
+    lang: 'ml',
+    text: 'എന്റെ പേര് രോഹൻ. ഞങ്ങളുടെ 2 ഏക്കർ കൃഷിഭൂമി അയൽവാസി അനധികൃതമായി കയ്യേറി വേലി കെട്ടി. ചോദിക്കാൻ ചെന്നപ്പോൾ ഭീഷണിപ്പെടുത്തുന്നു. എനിക്ക് അടിയന്തര സംരക്ഷണവും ഭൂമി തിരികെ ലഭിക്കാനും സഹായം വേണം.'
   },
   {
-    title: 'Consumer Product Fraud (వినియోగదారుల మోసం / उपभोक्ता धोखाधड़ी)',
+    title: 'Consumer Product Fraud',
     lang: 'en',
     text: 'I purchased heavy industrial machinery worth 4.5 Lakhs from Apex Machinery Ltd. It stopped working within 10 days, and the vendor is refusing warranty replacement or refund.'
   }
@@ -232,7 +232,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in">
@@ -257,7 +257,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-800 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
-                Voice Justice Access &bull; పౌర న్యాయ సహాయం
+                Voice Justice Access &bull; Judicial Assistance
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-white font-cinzel tracking-tight">
@@ -274,7 +274,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
         <div className="mb-6 p-3 rounded-2xl bg-zinc-900/90 border border-zinc-800">
           <div className="flex items-center justify-between mb-2">
             <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
-              <span>Choose Your Spoken Language (మీ భాషను ఎంచుకోండి):</span>
+              <span>Choose Your Spoken Language:</span>
             </label>
             <span className="text-[10px] text-amber-400 font-medium">
               24 Indian Languages Supported
@@ -430,7 +430,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
               {!isRecording && !transcript && (
                 <div className="mt-4 pt-4 border-t border-zinc-800/80 w-full text-left">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
-                    Or Test with a Voice Scenario (నమూనా సమస్యలు):
+                    Or Test with a Voice Scenario:
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {SAMPLE_VOICE_STORIES.map((story, idx) => (
@@ -465,7 +465,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
                   <FileText className="w-3.5 h-3.5 text-red-400" />
-                  <span>Captured Citizen Narrative (మీ మాటల సారాంశం):</span>
+                  <span>Captured Citizen Narrative:</span>
                 </label>
                 {transcript && (
                   <button
@@ -502,7 +502,7 @@ export const VoiceCaseFilerModal: React.FC<VoiceCaseFilerModalProps> = ({
                 ) : (
                   <>
                     <Scale className="w-4 h-4" />
-                    <span>Draft & File Court Petition Automatically (కేసును నమోదు చేయండి)</span>
+                    <span>Draft & File Court Petition Automatically</span>
                   </>
                 )}
               </button>

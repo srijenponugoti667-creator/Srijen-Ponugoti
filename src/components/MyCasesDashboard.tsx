@@ -46,7 +46,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
 
   useEffect(() => {
     fetchMyCases();
-  }, [currentUser.id, currentUser.role, currentUser.isVerifiedLawyer]);
+  }, [currentUser?.id, currentUser?.role, currentUser?.isVerifiedLawyer]);
 
   const handleRunAiDelayAnalysis = async (caseId: string) => {
     try {
@@ -76,29 +76,29 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start space-x-3.5">
             <div className="w-10 h-10 rounded-xl bg-red-950/70 border border-red-800/60 flex items-center justify-center flex-shrink-0 text-red-300">
-              {currentUser.role === 'client' ? <Lock className="w-5 h-5 text-amber-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+              {currentUser?.role === 'client' ? <Lock className="w-5 h-5 text-amber-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-red-400">
-                  {currentUser.role === 'client' ? t('rule2BannerClient') : t('rule1BannerLawyer')}
+                  {currentUser?.role === 'client' ? t('rule2BannerClient') : t('rule1BannerLawyer')}
                 </span>
                 <span className="px-2 py-0.2 rounded-full bg-zinc-950 text-[10px] text-slate-300 border border-zinc-800 font-mono">
-                  Tenant: {currentUser.id}
+                  Tenant: {currentUser?.id || 'guest'}
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                {currentUser.role === 'client' ? (
+                {currentUser?.role === 'client' ? (
                   <>
                     {t('rule2ClientDesc')}
                   </>
-                ) : currentUser.isVerifiedLawyer ? (
+                ) : currentUser?.isVerifiedLawyer ? (
                   <>
-                    Logged in as <strong>{currentUser.name}</strong> (Bar Council ID: <span className="font-mono text-emerald-400">{currentUser.barCouncilNumber}</span>). {t('rule1LawyerDesc')}
+                    Logged in as <strong>{currentUser?.name}</strong> (Bar Council ID: <span className="font-mono text-emerald-400">{currentUser?.barCouncilNumber}</span>). {t('rule1LawyerDesc')}
                   </>
                 ) : (
                   <>
-                    ⚠️ Logged in as <strong>{currentUser.name}</strong> (Verification In Progress). {t('rule1UnverifiedDesc')}
+                    ⚠️ Logged in as <strong>{currentUser?.name}</strong> (Verification In Progress). {t('rule1UnverifiedDesc')}
                   </>
                 )}
               </p>
@@ -118,7 +118,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
               </button>
             )}
 
-            {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer ? (
+            {currentUser?.role === 'lawyer' && !currentUser?.isVerifiedLawyer ? (
               <button
                 id="btn-trigger-bar-verify"
                 onClick={onOpenVerifyModal}
@@ -144,10 +144,10 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-cinzel">
-            {currentUser.role === 'lawyer' ? t('myCasesTitleLawyer') : t('myCasesTitleClient')}
+            {currentUser?.role === 'lawyer' ? t('myCasesTitleLawyer') : t('myCasesTitleClient')}
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-            {currentUser.role === 'lawyer'
+            {currentUser?.role === 'lawyer'
               ? t('myCasesSubtitleLawyer')
               : t('myCasesSubtitleClient')}
           </p>
@@ -225,12 +225,12 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                       id={`btn-open-case-files-${caseItem.id}`}
                       onClick={() => onOpenCaseFiles(caseItem.id)}
                       className={`flex items-center space-x-2 px-5 py-3 rounded-xl font-bold text-xs sm:text-sm shadow-xl transition-all active:scale-95 ${
-                        currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer
+                        currentUser?.role === 'lawyer' && !currentUser?.isVerifiedLawyer
                           ? 'bg-amber-950 text-amber-300 border border-amber-800/80 hover:bg-amber-900'
                           : 'bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 hover:to-red-700 text-white border border-red-500/40'
                       }`}
                     >
-                      {currentUser.role === 'lawyer' && !currentUser.isVerifiedLawyer ? (
+                      {currentUser?.role === 'lawyer' && !currentUser?.isVerifiedLawyer ? (
                         <>
                           <Lock className="w-4 h-4 text-amber-400" />
                           <span>Inspect Files (Rule 1 Check)</span>

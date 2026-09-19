@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Scale, User as UserIcon, Briefcase, Mail, Phone, Lock, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
+import { X, Scale, User as UserIcon, Briefcase, Mail, Phone, Lock, ShieldCheck, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { getTranslation } from '../languages';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface AuthModalProps {
   onAuthSuccess: (user: User) => void;
   availablePersonas: User[];
   onSwitchPersona: (userId: string) => void;
+  currentLanguage?: string;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -16,7 +18,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onAuthSuccess,
   availablePersonas,
   onSwitchPersona,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [tab, setTab] = useState<'register' | 'login'>('register');
   const [role, setRole] = useState<UserRole>('client');
 
@@ -78,51 +82,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-xl rounded-3xl bg-zinc-950 border border-zinc-800 shadow-2xl overflow-hidden text-slate-200 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+      <div className="relative w-full max-w-xl rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden text-slate-900 max-h-[92vh] flex flex-col">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-gradient-to-r from-red-950/70 via-zinc-900 to-red-950/70">
+        {/* Header - Executive Light Theme */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-900 text-white">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-red-950 border border-red-800 flex items-center justify-center text-red-300">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400">
               <Scale className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white font-cinzel">
                 JusticeBridge Account Portal
               </h3>
-              <p className="text-xs text-red-300">
-                Judicial Multi-Tenancy & Access Authentication
+              <p className="text-xs text-amber-300">
+                Judicial Authentication & 21-Day All-Access Registration
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-zinc-800 bg-zinc-900/50">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2 gap-2">
           <button
             onClick={() => setTab('register')}
-            className={`flex-1 py-3 text-xs font-bold transition-all ${
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
               tab === 'register'
-                ? 'text-white border-b-2 border-red-600 bg-zinc-900/80'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'border-slate-900 text-slate-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             Register New Account
           </button>
           <button
             onClick={() => setTab('login')}
-            className={`flex-1 py-3 text-xs font-bold transition-all ${
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
               tab === 'login'
-                ? 'text-white border-b-2 border-red-600 bg-zinc-900/80'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'border-slate-900 text-slate-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             Quick Persona Switch
@@ -130,55 +134,66 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 sm:p-7">
           {error && (
-            <div className="p-3 mb-4 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs flex items-center space-x-2">
-              <span className="font-semibold">{error}</span>
+            <div className="p-3 mb-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+              {error}
             </div>
           )}
 
           {tab === 'register' ? (
             <form onSubmit={handleRegister} className="space-y-4">
               
+              {/* Option A: 21-Day Free Trial Highlight */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50 via-white to-sky-50 border border-amber-200 text-xs">
+                <div className="flex items-center space-x-2 text-amber-900 font-extrabold mb-1">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>21-Day All-Access Free Trial Included</span>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Start with <strong>21 days free access</strong> (₹0 today). Your auto-payment mandate is scheduled on <strong>Day 22</strong> ({role === 'lawyer' ? '₹5,999/yr' : '₹2,999/yr'}). Cancel anytime with 1-click before Day 22.
+                </p>
+              </div>
+
               {/* Role Selection */}
               <div>
-                <label className="text-xs text-slate-400 font-semibold block mb-1.5">
+                <label className="text-xs text-slate-700 font-semibold block mb-1.5">
                   Select Your Account Role
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setRole('client')}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                       role === 'client'
-                        ? 'bg-red-950/80 border-red-600 text-white shadow-md'
-                        : 'bg-zinc-900 border-zinc-800 text-slate-400 hover:text-slate-200'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center space-x-2 mb-1">
-                      <UserIcon className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-white">Client / Litigant</span>
+                      <UserIcon className={`w-4 h-4 ${role === 'client' ? 'text-amber-400' : 'text-slate-600'}`} />
+                      <span className="text-xs font-bold">Client / Litigant</span>
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      File petitions, monitor isolated cases, track hearing delays.
+                    <p className={`text-[11px] ${role === 'client' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      File petitions, monitor isolated cases, track delays.
                     </p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setRole('lawyer')}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                    className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                       role === 'lawyer'
-                        ? 'bg-red-950/80 border-red-600 text-white shadow-md'
-                        : 'bg-zinc-900 border-zinc-800 text-slate-400 hover:text-slate-200'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center space-x-2 mb-1">
-                      <Briefcase className="w-4 h-4 text-red-400" />
-                      <span className="text-xs font-bold text-white">Advocate / Lawyer</span>
+                      <Briefcase className={`w-4 h-4 ${role === 'lawyer' ? 'text-amber-400' : 'text-slate-600'}`} />
+                      <span className="text-xs font-bold">Advocate / Lawyer</span>
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Bar Council verified practice, case vault access & directory listing.
+                    <p className={`text-[11px] ${role === 'lawyer' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Bar Council practice, case vault & client discovery.
                     </p>
                   </button>
                 </div>
@@ -187,134 +202,104 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Name & Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-slate-400 font-semibold block mb-1">Full Name</label>
+                  <label className="text-xs text-slate-700 font-semibold block mb-1">Full Name</label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={role === 'lawyer' ? 'Adv. Vikram Seth' : 'Aarav Mehta'}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-slate-900 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400 font-semibold block mb-1">Email Address</label>
+                  <label className="text-xs text-slate-700 font-semibold block mb-1">Email Address</label>
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="user@example.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-slate-900 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Phone */}
               <div>
-                <label className="text-xs text-slate-400 font-semibold block mb-1">Phone Number</label>
+                <label className="text-xs text-slate-700 font-semibold block mb-1">Phone Number</label>
                 <input
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your 10-digit mobile number"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-slate-900 focus:outline-none"
                 />
               </div>
 
-              {/* Advocate Specific Fields */}
+              {/* Lawyer Specific Fields */}
               {role === 'lawyer' && (
-                <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3 animate-in fade-in">
-                  <div className="flex items-center space-x-2 text-xs font-bold text-red-300 border-b border-zinc-800 pb-2">
-                    <ShieldCheck className="w-4 h-4 text-red-400" />
-                    <span>Bar Council & Practice Information</span>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex items-center space-x-2 text-xs font-bold text-slate-900">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Bar Council Credentials (e-KYC)</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">Bar Council Enrollment ID</label>
+                      <label className="text-[11px] text-slate-600 font-semibold block mb-1">Bar Council Enrolment No.</label>
                       <input
                         type="text"
                         value={barCouncilNumber}
                         onChange={(e) => setBarCouncilNumber(e.target.value)}
-                        placeholder="D/3820/2018"
-                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-xs font-mono outline-none focus:border-red-600"
+                        placeholder="e.g. D/1842/2016"
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-slate-900"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">State Bar Council</label>
-                      <select
+                      <label className="text-[11px] text-slate-600 font-semibold block mb-1">State Bar Council</label>
+                      <input
+                        type="text"
                         value={stateBarCouncil}
                         onChange={(e) => setStateBarCouncil(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
-                      >
-                        <option value="Bar Council of Delhi">Bar Council of Delhi</option>
-                        <option value="Bar Council of Maharashtra & Goa">Bar Council of Maharashtra & Goa</option>
-                        <option value="Bar Council of Karnataka">Bar Council of Karnataka</option>
-                        <option value="Bar Council of Tamil Nadu">Bar Council of Tamil Nadu</option>
-                        <option value="Bar Council of West Bengal">Bar Council of West Bengal</option>
-                      </select>
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-slate-900"
+                      />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">Years of Experience</label>
+                      <label className="text-[11px] text-slate-600 font-semibold block mb-1">Experience (Years)</label>
                       <input
                         type="number"
-                        min="1"
-                        max="50"
                         value={yearsExperience}
                         onChange={(e) => setYearsExperience(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-slate-900"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">Advisory Fee (₹ INR)</label>
+                      <label className="text-[11px] text-slate-600 font-semibold block mb-1">Consultation Fee (₹)</label>
                       <input
                         type="number"
-                        step="500"
                         value={consultationFee}
                         onChange={(e) => setConsultationFee(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-slate-900"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Practice Bio</label>
-                    <textarea
-                      rows={2}
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      placeholder="Senior advocate practicing in constitutional writs, commercial arbitration..."
-                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white text-xs outline-none focus:border-red-600 resize-none"
-                    />
                   </div>
                 </div>
               )}
 
-              {/* Membership notice reminder */}
-              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 text-[11px] text-slate-400">
-                <span className="text-amber-400 font-semibold block mb-0.5">Membership Plan Notice:</span>
-                {role === 'client'
-                  ? 'Client accounts require an annual pass of ₹2,999/year to file petitions and track isolated cases.'
-                  : 'Advocate accounts require a practice subscription of ₹3,999/month for verified case vault discovery.'}
-              </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 text-white font-bold text-xs shadow-xl flex items-center justify-center space-x-2 active:scale-95 transition-all"
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 active:scale-95 transition-all cursor-pointer"
               >
                 {loading ? (
                   <span>Creating Account...</span>
                 ) : (
                   <>
-                    <span>Complete Registration</span>
+                    <span>Start 21-Day Free Trial</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -323,8 +308,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-slate-400">
-                Select any pre-configured testing persona to test Rule 1 (Verified Lawyers vs Unverified), Rule 2 (Client Isolation), and membership payment notifications.
+              <p className="text-xs text-slate-600">
+                Switch instantly between pre-configured testing personas to verify access controls, trial status, and case isolation.
               </p>
 
               <div className="space-y-2.5">
@@ -335,32 +320,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       onSwitchPersona(p.id);
                       onClose();
                     }}
-                    className="w-full p-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-red-800 flex items-center justify-between text-left transition-all"
+                    className="w-full p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-between text-left transition-all cursor-pointer"
                   >
                     <div className="flex items-center space-x-3">
                       <img
                         src={p.avatar}
                         alt={p.name}
-                        className="w-10 h-10 rounded-xl object-cover border border-zinc-700"
+                        className="w-9 h-9 rounded-xl object-cover border border-slate-200"
                       />
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-xs font-bold text-white">{p.name}</span>
+                          <span className="text-xs font-bold text-slate-900">{p.name}</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            p.role === 'lawyer'
-                              ? p.isVerifiedLawyer
-                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                : 'bg-amber-950 text-amber-300 border border-amber-800'
-                              : 'bg-red-950 text-red-300 border border-red-800'
+                            p?.role === 'lawyer'
+                              ? p?.isVerifiedLawyer
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : 'bg-blue-100 text-blue-800 border border-blue-300'
                           }`}>
-                            {p.role === 'lawyer' ? (p.isVerifiedLawyer ? 'Verified Advocate' : 'Unverified Lawyer') : 'Client'}
+                            {p?.role === 'lawyer' ? (p?.isVerifiedLawyer ? 'Verified Advocate' : 'Unverified Lawyer') : 'Client'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{p.email}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{p.email}</p>
                       </div>
                     </div>
 
-                    <ArrowRight className="w-4 h-4 text-slate-500" />
+                    <ArrowRight className="w-4 h-4 text-slate-400" />
                   </button>
                 ))}
               </div>

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Lock, AlertTriangle, FileText, Download, Upload, CheckCircle2, FileCheck, ShieldAlert, Sparkles, Hash, Eye } from 'lucide-react';
 import { CaseDocument, User } from '../types';
+import { getTranslation } from '../languages';
 
 interface CaseFileViewerModalProps {
   caseId: string | null;
   currentUser: User;
   onClose: () => void;
   onOpenVerifyModal: () => void;
+  currentLanguage?: string;
 }
 
 export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
@@ -14,7 +16,9 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
   currentUser,
   onClose,
   onOpenVerifyModal,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [loading, setLoading] = useState<boolean>(true);
   const [authorized, setAuthorized] = useState<boolean>(false);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('');
@@ -62,7 +66,7 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
     };
 
     fetchFiles();
-  }, [caseId, currentUser.id, currentUser.isVerifiedLawyer]);
+  }, [caseId, currentUser?.id, currentUser?.isVerifiedLawyer]);
 
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +167,7 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
               <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left text-xs space-y-2 mb-8">
                 <div className="flex items-center justify-between text-slate-400">
                   <span>Current User Role:</span>
-                  <span className="font-bold text-white capitalize">{currentUser.role}</span>
+                  <span className="font-bold text-white capitalize">{currentUser?.role || 'Guest'}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
                   <span>Bar Council Standing:</span>
@@ -251,7 +255,7 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
                         <label className="text-[11px] text-slate-400 block mb-1">Uploaded By</label>
                         <input
                           type="text"
-                          value={currentUser.name}
+                          value={currentUser?.name || ''}
                           disabled
                           className="w-full px-2.5 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-slate-400 text-xs"
                         />

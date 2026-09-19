@@ -155,7 +155,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en' }) => {
                     <strong>2. Bar Council of India Compliance:</strong> In strict compliance with the Advocates Act, 1961 and Bar Council of India (BCI) rules, JusticeBridge does not engage in touting, lawyer advertising, or soliciting legal work. Listing is restricted to advocates with authenticated enrollment numbers.
                   </p>
                   <p>
-                    <strong>3. User Accounts & Subscriptions:</strong> Annual client memberships (₹2,999/yr) and advocate practice plans (₹3,999/mo) unlock digital discovery, case CNR alerts, and vault access. All prices include applicable 18% Goods and Services Tax (GST).
+                    <strong>3. User Accounts & Subscriptions:</strong> Annual client memberships (₹2,999/yr) and advocate practice plans (₹5,999/yr) unlock digital discovery, case CNR alerts, and vault access. All prices include applicable 18% Goods and Services Tax (GST).
                   </p>
                   <p>
                     <strong>4. Limitation of Liability:</strong> Legal advice rendered during advocate consultations is solely the responsibility of the verified practitioner. JusticeBridge does not guarantee specific court outcomes.
@@ -193,7 +193,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en' }) => {
                 <p className="text-xs text-slate-500 mb-4">Clear & Transparent Refund Guarantees</p>
                 <div className="space-y-4 text-xs leading-relaxed text-slate-300">
                   <p>
-                    <strong>1. Membership Subscriptions:</strong> If you purchase an Annual Client Justice Pass (₹2,999) or Advocate Practice Plan (₹3,999) and have not utilized any legal consultations or filed active matters, you are eligible for a <strong>100% full refund within 7 days</strong> of purchase.
+                    <strong>1. Membership Subscriptions:</strong> If you purchase an Annual Client Justice Pass (₹2,999) or Advocate Practice Plan (₹5,999) and have not utilized any legal consultations or filed active matters, you are eligible for a <strong>100% full refund within 7 days</strong> of purchase.
                   </p>
                   <p>
                     <strong>2. Advocate Consultations:</strong> If an advocate cancels or misses a scheduled consultation booking, the full consultation fee is automatically refunded to the client’s source payment method.

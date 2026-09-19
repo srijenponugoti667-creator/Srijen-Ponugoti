@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.justicebridge.app",
+      "sha256_cert_fingerprints": [
+        "32:57:D5:99:A4:9D:2C:96:1A:47:1C:A9:84:3F:59:D3:41:A4:65:80:45:B3:FC:08:7D:F4:23:7B:73:3B:8D:6D",
+        "8C:22:CC:81:D2:F6:3C:A6:DF:98:E9:E5:33:0C:B7:84:C8:A3:95:1D:47:DB:E5:53:50:52:87:87:E8:7B:B7:63",
+        "FD:B1:34:CF:FB:2B:64:89:C8:EB:E6:9E:04:1E:8F:7C:E6:64:58:3E:27:AE:03:0B:4A:BD:89:C2:59:E7:09:61"
+      ]
+    }
+  }
+]

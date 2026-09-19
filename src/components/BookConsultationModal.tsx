@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, Calendar, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { LawyerProfile, User } from '../types';
+import { getTranslation } from '../languages';
 
 interface BookConsultationModalProps {
   lawyer: LawyerProfile | null;
   currentUser: User;
   onClose: () => void;
   onSuccess: () => void;
+  currentLanguage?: string;
 }
 
 export const BookConsultationModal: React.FC<BookConsultationModalProps> = ({
@@ -14,7 +16,9 @@ export const BookConsultationModal: React.FC<BookConsultationModalProps> = ({
   currentUser,
   onClose,
   onSuccess,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [selectedDate, setSelectedDate] = useState<string>('2026-09-02');
   const [selectedTime, setSelectedTime] = useState<string>('11:00 AM');
   const [matterTitle, setMatterTitle] = useState<string>('');
@@ -22,7 +26,7 @@ export const BookConsultationModal: React.FC<BookConsultationModalProps> = ({
   const [booking, setBooking] = useState<boolean>(false);
   const [booked, setBooked] = useState<boolean>(false);
 
-  if (!lawyer) return null;
+  if (!lawyer || !currentUser) return null;
 
   const timeSlots = ['10:00 AM', '11:00 AM', '02:30 PM', '04:00 PM', '05:30 PM'];
 

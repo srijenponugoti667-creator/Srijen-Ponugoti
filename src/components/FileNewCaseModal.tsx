@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, FileText, Scale, ShieldCheck, CheckCircle2, Upload, AlertCircle } from 'lucide-react';
 import { User, CaseMatter } from '../types';
+import { getTranslation } from '../languages';
 
 interface FileNewCaseModalProps {
   currentUser: User;
   isOpen: boolean;
   onClose: () => void;
   onCaseFiled: (newCase: CaseMatter) => void;
+  currentLanguage?: string;
 }
 
 export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
@@ -14,7 +16,9 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
   isOpen,
   onClose,
   onCaseFiled,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [title, setTitle] = useState<string>('');
   const [caseType, setCaseType] = useState<string>('Commercial Dispute');
   const [courtName, setCourtName] = useState<string>('High Court of Delhi (Commercial Division)');
@@ -22,7 +26,7 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
   const [summaryBrief, setSummaryBrief] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
   const courts = [
     'High Court of Delhi (Commercial Division)',

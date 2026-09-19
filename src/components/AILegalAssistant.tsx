@@ -25,6 +25,12 @@ const quickQueriesByLang: Record<string, string[]> = {
     'Explain the procedure under Section 138 of Negotiable Instruments Act',
     'What documents are needed to draft an Article 226 High Court writ?'
   ],
+  ml: [
+    'ഭൂമി ആക്രണമത്തിനെതിരെ സ്റ്റേ ഓർഡർ എങ്ങനെ ലഭിക്കും?',
+    'ചെക്ക് ബൗൺസ് ആയാൽ സ്വീകരിക്കേണ്ട നിയമ നടപടികൾ എന്തെല്ലാം?',
+    'പോലീസ് FIR രജിസ്റ്റർ ചെയ്തില്ലെങ്കിൽ കോടതിയെ എങ്ങനെ സമീപിക്കാം?',
+    'ഉപഭോക്തൃ കോടതിയിൽ നഷ്ടപരിഹാരം ലഭിക്കാനുള്ള വഴി എന്ത്?'
+  ],
   te: [
     'భూ ఆక్రమణపై కోర్టులో ఇంజంక్షన్ ఆర్డర్ ఎలా పొందాలి?',
     'చెక్కు బౌన్స్ అయితే నోటీస్ ఇచ్చే చట్టపరమైన విధానం ఏమిటి?',
@@ -74,8 +80,7 @@ export const AILegalAssistant: React.FC<AILegalAssistantProps> = ({
       sender: 'assistant',
       text: `Namaste! I am your **JusticeBridge AI Judicial Assistant**, trained on Indian Constitutional, Civil & Criminal Jurisprudence (BNS, BNSS, CPC, Commercial Courts Act, NI Act).
 
-మీరు ఏ భారతీయ భాషలోనైనా మాట్లాడవచ్చు / आप अपनी मातृभाषा में कानूनी सलाह प्राप्त कर सकते हैं।
-Select your preferred language above or press the **Mic** button to speak your grievance.`,
+You can speak or type in any Indian language to receive instant judicial guidance. Select your preferred language above or press the **Mic** button to speak your grievance.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       source: 'JusticeBridge Judicial Intelligence'
     }
@@ -256,7 +261,7 @@ Select your preferred language above or press the **Mic** button to speak your g
             className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-red-700 via-red-800 to-amber-700 hover:from-red-600 text-white font-bold text-xs shadow-xl border border-red-500/50 transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             <Mic className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>Voice Case Filing (మాట్లాడి కేసు నమోదు / बोलकर केस दर्ज करें)</span>
+            <span>Voice Case Filing (Voice E-Filing)</span>
           </button>
         )}
       </div>
@@ -353,7 +358,7 @@ Select your preferred language above or press the **Mic** button to speak your g
                           ) : (
                             <>
                               <Volume2 className="w-3 h-3" />
-                              <span className="text-[10px]">Listen (వినండి / सुनिए)</span>
+                              <span className="text-[10px]">Listen</span>
                             </>
                           )}
                         </button>

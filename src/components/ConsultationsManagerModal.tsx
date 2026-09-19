@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, Video, CheckCircle2, AlertCircle, Phone, User, ExternalLink, ShieldCheck } from 'lucide-react';
 import { User as UserType, ConsultationBooking } from '../types';
+import { getTranslation } from '../languages';
 
 interface ConsultationsManagerModalProps {
   currentUser: UserType;
   isOpen: boolean;
   onClose: () => void;
+  currentLanguage?: string;
 }
 
 export const ConsultationsManagerModal: React.FC<ConsultationsManagerModalProps> = ({
   currentUser,
   isOpen,
   onClose,
+  currentLanguage = 'en',
 }) => {
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
   const [consultations, setConsultations] = useState<ConsultationBooking[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -49,7 +53,7 @@ export const ConsultationsManagerModal: React.FC<ConsultationsManagerModalProps>
             </div>
             <div>
               <h3 className="text-lg font-bold text-white font-cinzel">
-                {currentUser.role === 'lawyer' ? 'Chamber Consultation Schedule' : 'My Legal Advisory Appointments'}
+                {currentUser?.role === 'lawyer' ? 'Chamber Consultation Schedule' : 'My Legal Advisory Appointments'}
               </h3>
               <p className="text-xs text-red-300">
                 Direct Advocate Advisory & Secure Video Sessions
@@ -77,7 +81,7 @@ export const ConsultationsManagerModal: React.FC<ConsultationsManagerModalProps>
               <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-3" />
               <h4 className="text-sm font-bold text-white mb-1">No Consultations Scheduled</h4>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                {currentUser.role === 'lawyer'
+                {currentUser?.role === 'lawyer'
                   ? 'You currently have no incoming consultation requests from litigants.'
                   : 'You have not booked any advocate advisory consultations yet.'}
               </p>
@@ -113,12 +117,12 @@ export const ConsultationsManagerModal: React.FC<ConsultationsManagerModalProps>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-850">
                       <span className="text-[11px] text-slate-400 block mb-0.5">
-                        {currentUser.role === 'lawyer' ? 'Litigant / Client:' : 'Advocate:'}
+                        {currentUser?.role === 'lawyer' ? 'Litigant / Client:' : 'Advocate:'}
                       </span>
                       <p className="font-semibold text-slate-200">
-                        {currentUser.role === 'lawyer' ? item.clientName : item.lawyerName}
+                        {currentUser?.role === 'lawyer' ? item.clientName : item.lawyerName}
                       </p>
-                      <p className="text-[11px] text-slate-500">{currentUser.role === 'lawyer' ? item.clientEmail : ''}</p>
+                      <p className="text-[11px] text-slate-500">{currentUser?.role === 'lawyer' ? item.clientEmail : ''}</p>
                     </div>
 
                     <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-850">

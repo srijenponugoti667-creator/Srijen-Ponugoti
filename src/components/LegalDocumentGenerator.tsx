@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { FileText, Download, Sparkles, CheckCircle, Copy, AlertCircle } from 'lucide-react';
+import { FileText, Download, Sparkles, CheckCircle, Copy, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getTranslation } from '../languages';
 
 interface DocumentTemplate {
@@ -293,38 +293,117 @@ WITNESS 1: _____________________     WITNESS 2: _____________________`;
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Template Selection */}
-        <div className="lg:col-span-4 space-y-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-            {t('selectDocType')}
-          </h2>
-          {templates.map(tpl => {
-            const isSelected = tpl.id === selectedTemplate.id;
-            return (
-              <button
-                key={tpl.id}
-                onClick={() => handleSelectTemplate(tpl)}
-                className={`w-full text-left p-4 rounded-xl border transition-all text-xs ${
-                  isSelected
-                    ? 'bg-red-950/30 border-red-600 text-white shadow-lg ring-1 ring-red-500/30'
-                    : 'bg-zinc-900/60 border-zinc-800 text-slate-300 hover:border-zinc-700 hover:bg-zinc-900'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-zinc-800 text-slate-300 border border-zinc-700">
-                    {tpl.category}
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-400">
-                    Free / Included
-                  </span>
-                </div>
-                <h3 className="font-semibold text-slate-100 mt-1">{tpl.name}</h3>
-                <p className="text-slate-400 mt-1 line-clamp-2 text-[11px] leading-relaxed">
-                  {tpl.description}
-                </p>
-              </button>
-            );
-          })}
+        {/* Template Selection Column */}
+        <div className="lg:col-span-4">
+          
+          {/* Mobile Phone Horizontal Slide View (lg:hidden) */}
+          <div className="lg:hidden mb-6">
+            <div className="flex items-center justify-between mb-2.5 px-1">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  {t('selectDocType')}
+                </h2>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                Slide & Tap to Select
+              </span>
+            </div>
+
+            {/* Slide Rail */}
+            <div className="flex overflow-x-auto gap-3 pb-3 pt-1 scrollbar-none snap-x snap-mandatory -mx-4 px-4">
+              {templates.map((tpl, idx) => {
+                const isSelected = tpl.id === selectedTemplate.id;
+                return (
+                  <button
+                    key={tpl.id}
+                    onClick={() => handleSelectTemplate(tpl)}
+                    className={`min-w-[270px] max-w-[290px] flex-shrink-0 snap-center text-left p-3.5 rounded-2xl border transition-all text-xs relative ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-red-950/80 to-zinc-900 border-red-500 text-white shadow-xl shadow-red-950/50 ring-2 ring-red-500/50 scale-[1.02]'
+                        : 'bg-zinc-900/80 border-zinc-800 text-slate-300 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-800/90 text-slate-300 border border-zinc-700">
+                        {tpl.category}
+                      </span>
+                      <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800/50">
+                        Free PDF
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-slate-100 text-sm line-clamp-1">{tpl.name}</h3>
+                    <p className="text-slate-400 mt-1 line-clamp-2 text-[11px] leading-relaxed">
+                      {tpl.description}
+                    </p>
+
+                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500">Document {idx + 1} of {templates.length}</span>
+                      {isSelected ? (
+                        <span className="text-red-400 font-bold flex items-center space-x-1">
+                          <span>Active Document</span>
+                          <CheckCircle className="w-3 h-3" />
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-medium">Tap to load</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Slide Dots Indicator */}
+            <div className="flex items-center justify-center space-x-1.5 mt-1">
+              {templates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  onClick={() => handleSelectTemplate(tpl)}
+                  aria-label={tpl.name}
+                  className={`h-1.5 rounded-full transition-all ${
+                    tpl.id === selectedTemplate.id
+                      ? 'w-6 bg-red-500'
+                      : 'w-2 bg-zinc-700'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Vertical Column (hidden on mobile, visible on lg) */}
+          <div className="hidden lg:block space-y-3">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+              {t('selectDocType')}
+            </h2>
+            {templates.map(tpl => {
+              const isSelected = tpl.id === selectedTemplate.id;
+              return (
+                <button
+                  key={tpl.id}
+                  onClick={() => handleSelectTemplate(tpl)}
+                  className={`w-full text-left p-4 rounded-xl border transition-all text-xs ${
+                    isSelected
+                      ? 'bg-red-950/30 border-red-600 text-white shadow-lg ring-1 ring-red-500/30'
+                      : 'bg-zinc-900/60 border-zinc-800 text-slate-300 hover:border-zinc-700 hover:bg-zinc-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-zinc-800 text-slate-300 border border-zinc-700">
+                      {tpl.category}
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-400">
+                      Free / Included
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-slate-100 mt-1">{tpl.name}</h3>
+                  <p className="text-slate-400 mt-1 line-clamp-2 text-[11px] leading-relaxed">
+                    {tpl.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Right Column: Customization & Real PDF Generation */}
@@ -409,7 +488,7 @@ WITNESS 1: _____________________     WITNESS 2: _____________________`;
             {generatedPdfReady && (
               <div className="mt-4 p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                <span>Your official PDF document has been compiled and downloaded to your computer!</span>
+                <span>Your official PDF document has been compiled and downloaded to your device / phone!</span>
               </div>
             )}
           </div>

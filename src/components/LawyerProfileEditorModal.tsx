@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { X, User, ShieldCheck, Briefcase, MapPin, Award, CheckCircle2 } from 'lucide-react';
 import { User as UserType } from '../types';
+import { getTranslation } from '../languages';
 
 interface LawyerProfileEditorModalProps {
   currentUser: UserType;
   isOpen: boolean;
   onClose: () => void;
   onProfileUpdated: (updatedUser: UserType) => void;
+  currentLanguage?: string;
 }
 
 export const LawyerProfileEditorModal: React.FC<LawyerProfileEditorModalProps> = ({
@@ -14,18 +16,20 @@ export const LawyerProfileEditorModal: React.FC<LawyerProfileEditorModalProps> =
   isOpen,
   onClose,
   onProfileUpdated,
+  currentLanguage = 'en',
 }) => {
-  const [name, setName] = useState(currentUser.name);
-  const [phone, setPhone] = useState(currentUser.phone || '+91 ');
-  const [barCouncilNumber, setBarCouncilNumber] = useState(currentUser.barCouncilNumber || '');
-  const [stateBarCouncil, setStateBarCouncil] = useState(currentUser.stateBarCouncil || 'Bar Council of Delhi');
-  const [practiceLocation, setPracticeLocation] = useState(currentUser.practiceLocation || 'Supreme Court & High Court');
-  const [yearsExperience, setYearsExperience] = useState(String(currentUser.yearsExperience || 5));
-  const [consultationFee, setConsultationFee] = useState(String(currentUser.consultationFee || 2500));
-  const [bio, setBio] = useState(currentUser.bio || '');
-  const [loading, setLoading] = useState(false);
+  const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
+  if (!isOpen || !currentUser) return null;
 
-  if (!isOpen) return null;
+  const [name, setName] = useState(currentUser?.name || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '+91 ');
+  const [barCouncilNumber, setBarCouncilNumber] = useState(currentUser?.barCouncilNumber || '');
+  const [stateBarCouncil, setStateBarCouncil] = useState(currentUser?.stateBarCouncil || 'Bar Council of Delhi');
+  const [practiceLocation, setPracticeLocation] = useState(currentUser?.practiceLocation || 'Supreme Court & High Court');
+  const [yearsExperience, setYearsExperience] = useState(String(currentUser?.yearsExperience || 5));
+  const [consultationFee, setConsultationFee] = useState(String(currentUser?.consultationFee || 2500));
+  const [bio, setBio] = useState(currentUser?.bio || '');
+  const [loading, setLoading] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

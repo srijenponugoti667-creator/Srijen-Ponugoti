@@ -1,27 +1,77 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import rateLimit from 'express-rate-limit';
-
-const app = express();
-
-// Protect endpoints against automated bot attacks
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' }
-});
-
-app.use('/api/', apiLimiter);
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';
 
 const app = express();
+
+// Security Rate Limiter (Addresses CodeQL missing rate limiting alert)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // limit each IP to 200 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+
+app.use('/api/', apiLimiter);
+
+// Detect production environment:
+// 1. Explicit NODE_ENV === 'production'
+// 2. Or running the compiled bundle dist/server.cjs
+const isProduction = process.env.NODE_ENV === 'production' || (typeof __filename !== 'undefined' && __filename.includes('dist'));
+
+// In Google AI Studio container infrastructure, an nginx reverse proxy runs on 8080
+// and routes all incoming traffic exclusively to port 3000.
+// PORT must strictly be 3000 in all environments to prevent EADDRINUSE collisions.
 const PORT = 3000;
+
+// Permissive CORS & Asset Serving for PWA Builders and external verification crawlers
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Health check endpoints for Google Cloud Run container readiness & liveness probes
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
+// Explicit Public Static File Hosting with Cache & Headers
+const publicPath = path.resolve(process.cwd(), 'public');
+app.use(express.static(publicPath));
+
+// Service Worker with no-cache headers to ensure immediate client updates
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.resolve(publicPath, 'sw.js'));
+});
+
+// Explicit Manifest Routes with exact MIME types
+app.get(['/manifest.json', '/manifest.webmanifest', '/site.webmanifest'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.sendFile(path.resolve(publicPath, 'manifest.json'));
+});
+
+// Digital Asset Links for Android TWA
+app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.sendFile(path.resolve(publicPath, '.well-known/assetlinks.json'));
+});
 
 app.use(express.json());
 
@@ -49,549 +99,98 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// In-Memory Mock Database
-const users: Record<string, User> = {
-  'lawyer_rajesh': {
-    id: 'lawyer_rajesh',
-    name: 'Adv. Rajesh Sharma',
-    email: 'rajesh.sharma@justicebridge.law',
-    role: 'lawyer',
-    phone: '+91 98112 44321',
-    isVerifiedLawyer: true,
-    barCouncilNumber: 'D/1482/2011',
-    stateBarCouncil: 'Bar Council of Delhi',
-    practiceLocation: 'Supreme Court & Delhi High Court',
-    yearsExperience: 15,
-    specialization: ['Commercial Dispute', 'Constitutional Writ', 'Corporate Arbitration'],
-    membershipActive: false, // will prompt membership notification (₹3,999/mo)
-    membershipPlan: 'advocate_monthly',
-    membershipExpiresAt: undefined,
-    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
-    consultationFee: 3500,
-    bio: 'Senior Advocate with 15+ years experience in high-stakes corporate litigation, constitutional remedies, and commercial dispute resolution.',
-    rating: 4.9,
-    reviewCount: 128,
-    casesWon: 108
-  },
-  'lawyer_vikram': {
-    id: 'lawyer_vikram',
-    name: 'Adv. Vikramaditya Rao',
-    email: 'vikram.rao@justicebridge.law',
-    role: 'lawyer',
-    phone: '+91 98450 33219',
-    isVerifiedLawyer: true,
-    barCouncilNumber: 'KAR/2841/2006',
-    stateBarCouncil: 'Karnataka State Bar Council',
-    practiceLocation: 'Karnataka High Court & Supreme Court',
-    yearsExperience: 20,
-    specialization: ['Civil & Property', 'Constitutional Writ', 'Commercial Dispute'],
-    membershipActive: true,
-    membershipPlan: 'advocate_monthly',
-    membershipExpiresAt: '2027-01-01T00:00:00.000Z',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    consultationFee: 4200,
-    bio: 'Distinguished veteran counsel with 20 years of practice in real estate title litigation, land acquisition, constitutional petitions, and high-value civil trials.',
-    rating: 4.9,
-    reviewCount: 184,
-    casesWon: 162
-  },
-  'lawyer_meenakshi': {
-    id: 'lawyer_meenakshi',
-    name: 'Adv. Meenakshi Sundaram',
-    email: 'meenakshi.s@justicebridge.law',
-    role: 'lawyer',
-    phone: '+91 94440 91823',
-    isVerifiedLawyer: true,
-    barCouncilNumber: 'TN/5129/2012',
-    stateBarCouncil: 'Bar Council of Tamil Nadu & Puducherry',
-    practiceLocation: 'Madras High Court & Supreme Court',
-    yearsExperience: 14,
-    specialization: ['Corporate Arbitration', 'Commercial Dispute', 'Intellectual Property'],
-    membershipActive: true,
-    membershipPlan: 'advocate_monthly',
-    membershipExpiresAt: '2026-12-31T00:00:00.000Z',
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
-    consultationFee: 3200,
-    bio: 'Lead counsel specializing in cross-border corporate arbitration, supply chain contracts, and patent/trademark litigation.',
-    rating: 4.9,
-    reviewCount: 92,
-    casesWon: 84
-  },
-  'lawyer_harpreet': {
-    id: 'lawyer_harpreet',
-    name: 'Adv. Harpreet Singh Gill',
-    email: 'harpreet.gill@justicebridge.law',
-    role: 'lawyer',
-    phone: '+91 98140 77122',
-    isVerifiedLawyer: true,
-    barCouncilNumber: 'P&H/3301/2014',
-    stateBarCouncil: 'Bar Council of Punjab & Haryana',
-    practiceLocation: 'Punjab & Haryana High Court & Delhi HC',
-    yearsExperience: 12,
-    specialization: ['Criminal Defense', 'Constitutional Writ', 'Cyber Crime'],
-    membershipActive: true,
-    membershipPlan: 'advocate_monthly',
-    membershipExpiresAt: '2026-11-15T00:00:00.000Z',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    consultationFee: 2800,
-    bio: 'Trial defense counsel with focus on BNSS, economic offenses, and fundamental rights writs.',
-    rating: 4.7,
-    reviewCount: 76,
-    casesWon: 67
-  },
-  'lawyer_ananya': {
-    id: 'lawyer_ananya',
-    name: 'Adv. Ananya Sen',
-    email: 'ananya.sen@justicebridge.law',
-    role: 'lawyer',
-    phone: '+91 97401 88219',
-    isVerifiedLawyer: false, // UNVERIFIED LAWYER for testing Rule 1
-    barCouncilNumber: 'MH/9921/2023 (Verification In Progress)',
-    stateBarCouncil: 'Bar Council of Maharashtra & Goa',
-    practiceLocation: 'Bombay High Court & City Civil Court',
-    yearsExperience: 4,
-    specialization: ['Cyber Crime', 'Intellectual Property', 'Civil & Property'],
-    membershipActive: false,
-    membershipPlan: 'advocate_monthly',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    consultationFee: 2000,
-    bio: 'Associate Advocate specializing in technology contracts, data privacy litigations, and trademark protection.',
-    rating: 4.8,
-    reviewCount: 34,
-    casesWon: 29
-  },
-  'client_rohan': {
-    id: 'client_rohan',
-    name: 'Rohan Verma',
-    email: 'rohan.verma@techscale.io',
-    role: 'client',
-    phone: '+91 98200 11987',
-    membershipActive: false, // will prompt membership notification (₹2,999/yr)
-    membershipPlan: 'client_annual',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-  },
-  'client_priya': {
-    id: 'client_priya',
-    name: 'Priya Nair',
-    email: 'priya.nair@greenlandinfra.com',
-    role: 'client',
-    phone: '+91 94471 22845',
-    membershipActive: true, // already active
-    membershipPlan: 'client_annual',
-    membershipExpiresAt: '2027-04-15T00:00:00.000Z',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
+// Helper to ensure 21-Day Free Trial & Auto-Payment Mandate (Option A)
+function ensureUserTrial(user: User): User {
+  const isLawyer = user.role === 'lawyer';
+  const planFee = isLawyer ? 5999 : 2999;
+  
+  if (!user.trialStartDate) {
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+    user.trialStartDate = now.toISOString();
+    user.trialEndsAt = trialEnd.toISOString();
+    user.isTrialActive = true;
+    user.autoPaymentMandateActive = user.autoPaymentMandateActive ?? true; // Option A: Auto-payment mandate registered during onboarding
+    user.mandateMethod = user.mandateMethod ?? 'upi_autopay';
+    user.mandateDetails = user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
+    user.nextBillingDate = trialEnd.toISOString(); // Day 22 auto-debit
+    user.mandateStatus = 'active';
+    user.autoDebitAmount = planFee;
+    user.membershipActive = true; // Trial grants full access!
+    user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
+    user.membershipExpiresAt = trialEnd.toISOString();
   }
+
+  // Calculate dynamic days remaining
+  if (user.trialEndsAt) {
+    const msRemaining = new Date(user.trialEndsAt).getTime() - Date.now();
+    const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    user.trialDaysRemaining = daysRemaining;
+    user.isTrialActive = daysRemaining > 0 && !user.trialCancelled;
+    user.autoDebitAmount = isLawyer ? 5999 : 2999;
+  }
+
+  return user;
+}
+
+// Default Guest User with 21-Day Free Trial and Auto-Payment Mandate
+const nowTime = new Date();
+const defaultTrialEndTime = new Date(nowTime.getTime() + 21 * 24 * 60 * 60 * 1000);
+
+const defaultGuestUser: User = {
+  id: 'guest_user',
+  name: 'Litigant / Guest',
+  email: 'guest@justicebridge.in',
+  role: 'client',
+  membershipActive: true,
+  membershipPlan: 'client_annual',
+  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  trialStartDate: nowTime.toISOString(),
+  trialEndsAt: defaultTrialEndTime.toISOString(),
+  trialDaysRemaining: 21,
+  isTrialActive: true,
+  autoPaymentMandateActive: true,
+  mandateMethod: 'upi_autopay',
+  mandateDetails: 'UPI AutoPay (guest@oksbi)',
+  nextBillingDate: defaultTrialEndTime.toISOString(),
+  mandateStatus: 'active',
+  autoDebitAmount: 2999
 };
 
-// Global active persona for demonstration & testing
-let currentUserId = 'client_rohan';
+// In-Memory Database initialized with default guest user
+const users: Record<string, User> = {
+  guest_user: defaultGuestUser
+};
+
+// Global active persona ID
+let currentUserId = 'guest_user';
+
+function getCurrentUser(): User {
+  let user: User;
+  if (currentUserId && users[currentUserId]) {
+    user = users[currentUserId];
+  } else {
+    const keys = Object.keys(users);
+    if (keys.length > 0 && users[keys[0]]) {
+      user = users[keys[0]];
+    } else {
+      user = defaultGuestUser;
+    }
+  }
+  return ensureUserTrial(user);
+}
 
 // Consultations Store
 let consultationBookings: ConsultationBooking[] = [];
 
-// Verified Advocates Directory with Grading Performance Records
-let lawyersDirectory: LawyerProfile[] = [
-  {
-    id: 'lawyer_rajesh',
-    name: 'Adv. Rajesh Sharma',
-    barCouncilNumber: 'D/1482/2011',
-    stateBarCouncil: 'Bar Council of Delhi',
-    isVerified: true,
-    specialization: ['Commercial Dispute', 'Constitutional Writ', 'Corporate Arbitration'],
-    experienceYears: 15,
-    courts: ['Supreme Court of India', 'Delhi High Court', 'NCLT Delhi'],
-    rating: 4.9,
-    reviewsCount: 128,
-    consultationFee: 3500,
-    location: 'New Delhi, India',
-    bio: 'Senior Advocate with 15+ years experience in high-stakes corporate litigation, constitutional remedies, and commercial dispute resolution. Proven record in fast-track arbitration and pre-litigation settlements.',
-    casesResolved: 127,
-    activeCasesCount: 15,
-    casesTotal: 142,
-    casesWon: 108,
-    casesLost: 9,
-    casesCompromised: 19,
-    casesOngoing: 6,
-    winRate: 76.1,
-    compromiseRate: 13.4,
-    grade: 'A+',
-    tierTitle: 'Tier 1 Senior Trial Litigator',
-    badges: ['BCI Gold Verified', 'Top Trial Counsel', 'Mediation Master', 'Supreme Court Designated', 'Client Choice 2026'],
-    contactEmail: 'rajesh.sharma@justicebridge.law',
-    phone: '+91 98112 44321',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
-    reviews: [
-      {
-        id: 'rev_1',
-        lawyerId: 'lawyer_rajesh',
-        clientId: 'client_rohan',
-        clientName: 'Rohan Verma',
-        clientAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        caseType: 'Commercial Dispute',
-        caseOutcome: 'Won',
-        comment: 'Adv. Rajesh secured an urgent ex-parte interim injunction in Delhi High Court within 3 hearings. Exceptional court craft, razor-sharp statutory knowledge, and completely transparent fee structure.',
-        courtName: 'Delhi High Court',
-        verifiedLitigant: true,
-        createdAt: '2026-07-14'
-      },
-      {
-        id: 'rev_2',
-        lawyerId: 'lawyer_rajesh',
-        clientId: 'client_priya',
-        clientName: 'Priya Nair',
-        clientAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        caseType: 'Corporate Arbitration',
-        caseOutcome: 'Compromised',
-        comment: 'Guided our infrastructure joint-venture through Section 9 arbitration and achieved a mutually beneficial settlement agreement, saving us 2 years of courtroom litigation.',
-        courtName: 'Delhi International Arbitration Centre',
-        verifiedLitigant: true,
-        createdAt: '2026-06-22'
-      },
-      {
-        id: 'rev_3',
-        lawyerId: 'lawyer_rajesh',
-        clientId: 'client_anand',
-        clientName: 'Anand Infrastructure Ltd',
-        rating: 5,
-        caseType: 'Constitutional Writ',
-        caseOutcome: 'Won',
-        comment: 'Won a landmark Article 226 writ petition quashing an arbitrary municipal tender disqualification. Highly recommended for commercial and constitutional matters.',
-        courtName: 'Supreme Court of India',
-        verifiedLitigant: true,
-        createdAt: '2026-05-18'
-      }
-    ]
-  },
-  {
-    id: 'lawyer_vikram',
-    name: 'Adv. Vikramaditya Rao',
-    barCouncilNumber: 'KAR/2841/2006',
-    stateBarCouncil: 'Karnataka State Bar Council',
-    isVerified: true,
-    specialization: ['Civil & Property', 'Constitutional Writ', 'Commercial Dispute'],
-    experienceYears: 20,
-    courts: ['Supreme Court of India', 'Karnataka High Court', 'City Civil Court Bengaluru'],
-    rating: 4.9,
-    reviewsCount: 184,
-    consultationFee: 4200,
-    location: 'Bengaluru, Karnataka',
-    bio: 'Distinguished veteran counsel with 20 years of practice in real estate title litigation, land acquisition, constitutional petitions, and high-value civil trials.',
-    casesResolved: 198,
-    activeCasesCount: 12,
-    casesTotal: 210,
-    casesWon: 162,
-    casesLost: 14,
-    casesCompromised: 26,
-    casesOngoing: 8,
-    winRate: 77.1,
-    compromiseRate: 12.4,
-    grade: 'A+',
-    tierTitle: 'Distinguished Veteran Senior Counsel',
-    badges: ['BCI Platinum Verified', 'Supreme Court Veteran', 'Lok Adalat Champion', 'Speedy Disposal Champion'],
-    contactEmail: 'vikram.rao@justicebridge.law',
-    phone: '+91 98450 33219',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Sat'],
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    reviews: [
-      {
-        id: 'rev_4',
-        lawyerId: 'lawyer_vikram',
-        clientId: 'client_satish',
-        clientName: 'Satish Chandran',
-        rating: 5,
-        caseType: 'Civil & Property',
-        caseOutcome: 'Won',
-        comment: 'Resolved our 12-acre partition suit in record time. Adv. Vikramaditya’s grasp of Karnataka Land Revenue Act is peerless.',
-        courtName: 'Karnataka High Court',
-        verifiedLitigant: true,
-        createdAt: '2026-08-02'
-      },
-      {
-        id: 'rev_5',
-        lawyerId: 'lawyer_vikram',
-        clientId: 'client_meera',
-        clientName: 'Meera Kulkarni',
-        rating: 5,
-        caseType: 'Commercial Dispute',
-        caseOutcome: 'Compromised',
-        comment: 'Facilitated a clean Lok Adalat compromise deed in our commercial lease dispute, saving enormous stamp duty and court fees.',
-        courtName: 'City Civil Court Bengaluru',
-        verifiedLitigant: true,
-        createdAt: '2026-07-28'
-      }
-    ]
-  },
-  {
-    id: 'lawyer_meenakshi',
-    name: 'Adv. Meenakshi Sundaram',
-    barCouncilNumber: 'TN/5129/2012',
-    stateBarCouncil: 'Bar Council of Tamil Nadu & Puducherry',
-    isVerified: true,
-    specialization: ['Corporate Arbitration', 'Commercial Dispute', 'Intellectual Property'],
-    experienceYears: 14,
-    courts: ['Madras High Court', 'Supreme Court of India', 'NCLAT Chennai'],
-    rating: 4.9,
-    reviewsCount: 92,
-    consultationFee: 3200,
-    location: 'Chennai, Tamil Nadu',
-    bio: 'Lead counsel specializing in cross-border corporate arbitration, supply chain contracts, and patent/trademark litigation with extensive experience before Madras HC.',
-    casesResolved: 105,
-    activeCasesCount: 13,
-    casesTotal: 118,
-    casesWon: 84,
-    casesLost: 7,
-    casesCompromised: 21,
-    casesOngoing: 6,
-    winRate: 71.2,
-    compromiseRate: 17.8,
-    grade: 'A+',
-    tierTitle: 'Arbitration & Corporate Law Specialist',
-    badges: ['Arbitration Master', 'BCI Gold Verified', 'Dispute Resolution Award', 'Client Choice 2026'],
-    contactEmail: 'meenakshi.s@justicebridge.law',
-    phone: '+91 94440 91823',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
-    reviews: [
-      {
-        id: 'rev_6',
-        lawyerId: 'lawyer_meenakshi',
-        clientId: 'client_karthik',
-        clientName: 'Karthik Raja',
-        rating: 5,
-        caseType: 'Corporate Arbitration',
-        caseOutcome: 'Won',
-        comment: 'Adv. Meenakshi won our international supply contract arbitration with 100% damages award. Exceptional cross-examination skills.',
-        courtName: 'Madras High Court',
-        verifiedLitigant: true,
-        createdAt: '2026-08-11'
-      }
-    ]
-  },
-  {
-    id: 'lawyer_harpreet',
-    name: 'Adv. Harpreet Singh Gill',
-    barCouncilNumber: 'P&H/3301/2014',
-    stateBarCouncil: 'Bar Council of Punjab & Haryana',
-    isVerified: true,
-    specialization: ['Criminal Defense', 'Constitutional Writ', 'Cyber Crime'],
-    experienceYears: 12,
-    courts: ['Punjab & Haryana High Court', 'Delhi High Court', 'Supreme Court of India'],
-    rating: 4.7,
-    reviewsCount: 76,
-    consultationFee: 2800,
-    location: 'Chandigarh / New Delhi',
-    bio: 'Trial lawyer with intense focus on criminal defense under Bharatiya Nagarik Suraksha Sanhita (BNSS), white-collar fraud defenses, and fundamental rights writs.',
-    casesResolved: 82,
-    activeCasesCount: 12,
-    casesTotal: 94,
-    casesWon: 67,
-    casesLost: 11,
-    casesCompromised: 12,
-    casesOngoing: 4,
-    winRate: 71.3,
-    compromiseRate: 12.8,
-    grade: 'A',
-    tierTitle: 'Trial Defense & Constitutional Specialist',
-    badges: ['Top Trial Advocate', 'Bail & Trial Specialist', 'High Court Veteran'],
-    contactEmail: 'harpreet.gill@justicebridge.law',
-    phone: '+91 98140 77122',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    reviews: [
-      {
-        id: 'rev_7',
-        lawyerId: 'lawyer_harpreet',
-        clientId: 'client_gurpreet',
-        clientName: 'Gurpreet Singh',
-        rating: 5,
-        caseType: 'Criminal Defense',
-        caseOutcome: 'Won',
-        comment: 'Secured regular bail and quashing of Section 420 charges under new BNSS provisions in record time. Tremendous integrity and dedication.',
-        courtName: 'Punjab & Haryana High Court',
-        verifiedLitigant: true,
-        createdAt: '2026-07-05'
-      }
-    ]
-  },
-  {
-    id: 'lawyer_ananya',
-    name: 'Adv. Ananya Sen',
-    barCouncilNumber: 'MH/9921/2023 (Verification In Progress)',
-    stateBarCouncil: 'Bar Council of Maharashtra & Goa',
-    isVerified: false,
-    specialization: ['Cyber Crime', 'Intellectual Property', 'Civil & Property'],
-    experienceYears: 4,
-    courts: ['Bombay High Court', 'City Civil Court Mumbai'],
-    rating: 4.8,
-    reviewsCount: 34,
-    consultationFee: 2000,
-    location: 'Mumbai, Maharashtra',
-    bio: 'Associate Advocate specializing in technology contracts, data privacy litigations, cyber fraud recovery, and trademark protection.',
-    casesResolved: 37,
-    activeCasesCount: 9,
-    casesTotal: 46,
-    casesWon: 29,
-    casesLost: 5,
-    casesCompromised: 8,
-    casesOngoing: 4,
-    winRate: 63.0,
-    compromiseRate: 17.4,
-    grade: 'A',
-    tierTitle: 'Emerging Tech & IP Advocate',
-    badges: ['Fast-Track Resolution', 'Cyber Law Specialist', 'High Speed Settlement'],
-    contactEmail: 'ananya.sen@justicebridge.law',
-    phone: '+91 97401 88219',
-    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    reviews: [
-      {
-        id: 'rev_8',
-        lawyerId: 'lawyer_ananya',
-        clientId: 'client_deepak',
-        clientName: 'Deepak Merchant',
-        rating: 5,
-        caseType: 'Cyber Crime',
-        caseOutcome: 'Won',
-        comment: 'Recovered frozen fintech transaction funds through cyber cell coordination and magistrate order within 3 weeks.',
-        courtName: 'Bombay High Court',
-        verifiedLitigant: true,
-        createdAt: '2026-08-19'
-      }
-    ]
-  }
-];
+// Advocates Directory (Starts empty; populates when advocates register)
+let lawyersDirectory: LawyerProfile[] = [];
 
 // Mock Invoices
 let invoices: PaymentInvoice[] = [];
 
-// Cases Store
-let casesStore: CaseMatter[] = [
-  {
-    id: 'case_rohan_1',
-    caseNumber: 'COMM-SUIT/DL/2026/418',
-    cnrNumber: 'JB01-849201-2026',
-    title: 'TechScale Solutions Pvt Ltd vs. Bharat Supply Logistics Corp',
-    caseType: 'Commercial Dispute',
-    filingDate: '2026-02-10',
-    courtName: 'High Court of Delhi (Commercial Division)',
-    jurisdiction: 'High Court Commercial Jurisdiction',
-    bench: 'Commercial Appellate Division Bench II',
-    judgeName: 'Hon\'ble Justice S. K. Kaul (Presiding)',
-    petitioner: 'Rohan Verma (TechScale Solutions)',
-    respondent: 'Bharat Supply Logistics Corp',
-    clientId: 'client_rohan',
-    clientName: 'Rohan Verma',
-    clientEmail: 'rohan.verma@techscale.io',
-    assignedLawyerId: 'lawyer_rajesh',
-    assignedLawyerName: 'Adv. Rajesh Sharma',
-    status: 'Arguments',
-    stageDescription: 'Final Arguments on Section 9 Commercial Injunction Application',
-    daysElapsed: 42,
-    estimatedDisposalDays: 95,
-    delayRiskScore: 'Low',
-    delayDays: 0,
-    summaryBrief: 'Commercial recovery suit seeking ₹4.2 Crore unpaid invoices and damages under Section 9 of the Commercial Courts Act.',
-    nextHearingDate: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString().split('T')[0],
-    hearings: [
-      {
-        id: 'h_101',
-        hearingDate: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString().split('T')[0],
-        courtRoom: 'Courtroom 4, High Court of Delhi',
-        judgeName: 'Hon\'ble Justice S. K. Kaul',
-        stage: 'Final Arguments',
-        purpose: 'Hearing on Interim Relief & Order XXXIX Injunction',
-        status: 'Scheduled'
-      }
-    ],
-    documents: [
-      {
-        id: 'doc_101',
-        title: 'Original Commercial Plaint & Statement of Truth',
-        fileName: 'Plaint_TechScale_v_BharatLogistics.pdf',
-        fileType: 'pdf',
-        fileSize: '4.8 MB',
-        uploadedAt: '2026-02-10',
-        uploadedBy: 'Adv. Rajesh Sharma',
-        fileCategory: 'Petition',
-        isRestricted: true,
-        documentHash: 'sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
-        pageCount: 48,
-        summary: 'Complete commercial plaint with verified e-affidavit and annexures.'
-      },
-      {
-        id: 'doc_102',
-        title: 'Section 65B Electronic Evidence Affidavit',
-        fileName: 'Sec65B_Certificate_DigitalLogs.pdf',
-        fileType: 'pdf',
-        fileSize: '1.9 MB',
-        uploadedAt: '2026-02-18',
-        uploadedBy: 'Adv. Rajesh Sharma',
-        fileCategory: 'Evidence',
-        isRestricted: true,
-        documentHash: 'sha256:bf5804369a489111ff46efaa0313f0efb0e0081d6f2fd42cbceefc225a07c134',
-        pageCount: 14,
-        summary: 'Certified server communication logs and electronic ledger records.'
-      }
-    ]
-  },
-  {
-    id: 'case_priya_1',
-    caseNumber: 'WRIT-PET/KA/2026/892',
-    cnrNumber: 'JB01-572910-2026',
-    title: 'Greenland Infrastructure vs. Bangalore Development Authority (BDA)',
-    caseType: 'Constitutional Writ',
-    filingDate: '2026-01-20',
-    courtName: 'High Court of Karnataka (Bengaluru Bench)',
-    jurisdiction: 'High Court Constitutional Writ Jurisdiction',
-    bench: 'Single Judge Division Bench',
-    judgeName: 'Hon\'ble Justice Raghavendra Rao',
-    petitioner: 'Priya Nair (Greenland Infra)',
-    respondent: 'Bangalore Development Authority (BDA)',
-    clientId: 'client_priya',
-    clientName: 'Priya Nair',
-    clientEmail: 'priya.nair@greenlandinfra.com',
-    assignedLawyerId: 'lawyer_vikram',
-    assignedLawyerName: 'Adv. Vikramaditya Rao',
-    status: 'Notice',
-    stageDescription: 'Notice Issued to Respondent Authority with Status Quo Order',
-    daysElapsed: 55,
-    estimatedDisposalDays: 140,
-    delayRiskScore: 'Moderate',
-    delayDays: 14,
-    bottleneckReason: 'Waiting for BDA compliance report on road widening survey map.',
-    nextHearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0],
-    hearings: [
-      {
-        id: 'h_201',
-        hearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0],
-        courtRoom: 'Court Hall 2, Karnataka High Court',
-        judgeName: 'Hon\'ble Justice Raghavendra Rao',
-        stage: 'Respondent Compliance Review',
-        purpose: 'Review of BDA survey status report',
-        status: 'Scheduled'
-      }
-    ],
-    documents: [
-      {
-        id: 'doc_201',
-        title: 'Article 226 Constitutional Writ Petition',
-        fileName: 'Writ_Petition_Greenland_v_BDA.pdf',
-        fileType: 'pdf',
-        fileSize: '6.2 MB',
-        uploadedAt: '2026-01-20',
-        uploadedBy: 'Adv. Vikramaditya Rao',
-        fileCategory: 'Petition',
-        isRestricted: true,
-        documentHash: 'sha256:d8578edf8458ce06fbc5bb76a58c5ca4',
-        pageCount: 62,
-        summary: 'Writ challenging unnotified setback acquisition without statutory compensation.'
-      }
-    ]
-  }
-];
+// Cases Store (Starts empty; populates when litigants or advocates file cases)
+let casesStore: CaseMatter[] = [];
 
 // -------------------------------------------------------------
 // REST API ENDPOINTS & BACKEND SECURITY ENFORCEMENT
@@ -599,9 +198,9 @@ let casesStore: CaseMatter[] = [
 
 // 1. Get Current User / Switch Persona
 app.get('/api/auth/current-user', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   res.json({
-    user,
+    user: user || null,
     availablePersonas: Object.values(users)
   });
 });
@@ -643,14 +242,26 @@ app.post('/api/auth/register', (req, res) => {
     specialization: specialization || (isLawyer ? ['Commercial Dispute'] : undefined),
     consultationFee: consultationFee ? Number(consultationFee) : (isLawyer ? 2500 : undefined),
     bio: bio || (isLawyer ? 'Practicing advocate registered on JusticeBridge.' : undefined),
-    membershipActive: false, // New users start unpaid to trigger the notification rule
-    membershipPlan: isLawyer ? 'advocate_monthly' : 'client_annual',
+    membershipActive: true, // 21-Day Free Trial activated with full platform access
+    membershipPlan: isLawyer ? 'advocate_annual' : 'client_annual',
+    membershipExpiresAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
     avatar: isLawyer
       ? 'https://images.unsplash.com/photo-1556157382-97eda2d62296?w=150&auto=format&fit=crop&q=80'
       : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     rating: isLawyer ? 5.0 : undefined,
     reviewCount: isLawyer ? 0 : undefined,
-    casesWon: isLawyer ? 0 : undefined
+    casesWon: isLawyer ? 0 : undefined,
+    // 21-Day Free Trial & Auto-Payment Mandate (Option A)
+    trialStartDate: new Date().toISOString(),
+    trialEndsAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    trialDaysRemaining: 21,
+    isTrialActive: true,
+    autoPaymentMandateActive: true,
+    mandateMethod: 'upi_autopay',
+    mandateDetails: `UPI AutoPay (${email.split('@')[0]}@okhdfcbank)`,
+    nextBillingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    mandateStatus: 'active',
+    autoDebitAmount: isLawyer ? 5999 : 2999
   };
 
   users[newId] = newUser;
@@ -843,7 +454,7 @@ app.get('/api/lawyers/:id', (req, res) => {
 // Submit Client Review & Update Advocate Performance Statistics
 app.post('/api/lawyers/:id/reviews', (req, res) => {
   const { id } = req.params;
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { rating, caseType, caseOutcome, comment, courtName } = req.body;
 
   const lawyer = lawyersDirectory.find(l => l.id === id);
@@ -921,7 +532,7 @@ app.post('/api/lawyers/:id/reviews', (req, res) => {
 
 // Consultations Bookings API
 app.get('/api/consultations', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   let list = [...consultationBookings];
 
   if (user.role === 'client') {
@@ -934,7 +545,7 @@ app.get('/api/consultations', (req, res) => {
 });
 
 app.post('/api/consultations', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { lawyerId, lawyerName, bookingDate, timeSlot, consultationType, matterSubject, notes, fee } = req.body;
 
   if (!lawyerId || !bookingDate || !timeSlot || !matterSubject) {
@@ -982,7 +593,7 @@ app.patch('/api/consultations/:id/status', (req, res) => {
 
 // All Invoices for current user
 app.get('/api/invoices', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const userInvoices = invoices.filter(i => i.userId === user.id);
   res.json({ invoices: userInvoices });
 });
@@ -1066,7 +677,7 @@ app.get('/api/cases/search', (req, res) => {
 // -------------------------------------------------------------
 // "Clients are completely isolated so no client can see another client's cases."
 app.get('/api/cases', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
 
   if (user.role === 'client') {
     // STRICT CLIENT ISOLATION: Filter ONLY cases belonging to this specific client ID
@@ -1100,7 +711,7 @@ app.get('/api/cases', (req, res) => {
 // Single Case Detail with Strict Security Checks
 app.get('/api/cases/:id', (req, res) => {
   const { id } = req.params;
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -1129,7 +740,7 @@ app.get('/api/cases/:id', (req, res) => {
 // "Only verified lawyers can view case files."
 app.get('/api/cases/:id/files', (req, res) => {
   const { id } = req.params;
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -1187,7 +798,7 @@ app.get('/api/cases/:id/files', (req, res) => {
 
 // Create / File a new legal case matter
 app.post('/api/cases/file', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { title, caseType, courtName, respondent, summaryBrief, assignedLawyerId } = req.body;
 
   if (!title || !caseType || !courtName || !respondent) {
@@ -1212,7 +823,7 @@ app.post('/api/cases/file', (req, res) => {
     judgeName: 'Hon\'ble Presiding Judge',
     petitioner: `${user.name} (Client / Petitioner)`,
     respondent,
-    clientId: user.role === 'client' ? user.id : 'client_rohan', // Bound strictly to client
+    clientId: user.id, // Bound strictly to user
     clientName: user.name,
     clientEmail: user.email,
     assignedLawyerId: lawyer ? lawyer.id : 'unassigned',
@@ -1265,7 +876,7 @@ app.post('/api/cases/file', (req, res) => {
 // Upload document to a case
 app.post('/api/cases/:id/documents', (req, res) => {
   const { id } = req.params;
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { title, fileName, fileCategory, summary } = req.body;
 
   const caseItem = casesStore.find(c => c.id === id);
@@ -1302,25 +913,34 @@ app.post('/api/cases/:id/documents', (req, res) => {
 // -------------------------------------------------------------
 // Rules:
 // - Clients must see a notification to pay a membership fee of 2,999 Rupees per year.
-// - Advocates/Lawyers must see a notification to pay a membership fee of 3,999 Rupees per month.
+// - Advocates/Lawyers must see a notification to pay a membership fee of 5,999 Rupees per year.
 
 app.get('/api/membership/status', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
 
   const clientFee = 2999;
-  const advocateFee = 3999;
+  const advocateFee = 5999;
+  const isLawyer = user.role === 'lawyer';
+  const fee = isLawyer ? advocateFee : clientFee;
 
   let requiredPlan = {
-    planId: user.role === 'lawyer' ? 'advocate_monthly' : 'client_annual',
-    title: user.role === 'lawyer' ? 'Advocate Practice Subscription' : 'Client Justice Pass',
-    fee: user.role === 'lawyer' ? advocateFee : clientFee,
+    planId: isLawyer ? 'advocate_annual' : 'client_annual',
+    title: isLawyer ? 'Advocate Practice Subscription' : 'Client Justice Pass',
+    fee,
     currency: 'INR',
-    period: user.role === 'lawyer' ? 'per month' : 'per year',
-    periodShort: user.role === 'lawyer' ? '/mo' : '/yr',
-    notificationMessage: user.role === 'lawyer'
-      ? 'Advocates/Lawyers must pay a membership fee of 3,999 Rupees per month to access verified case discovery, unlimited case files, and cause-list sync.'
-      : 'Clients must pay a membership fee of 2,999 Rupees per year for complete case tracking, encrypted vault access, and priority advocate consultations.',
-    features: user.role === 'lawyer'
+    period: 'per year',
+    periodShort: '/yr',
+    trialDays: 21,
+    trialDaysRemaining: user.trialDaysRemaining ?? 21,
+    isTrialActive: user.isTrialActive ?? true,
+    autoPaymentMandateActive: user.autoPaymentMandateActive ?? true,
+    mandateMethod: user.mandateMethod ?? 'upi_autopay',
+    mandateDetails: user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)'),
+    nextBillingDate: user.nextBillingDate || user.trialEndsAt,
+    notificationMessage: isLawyer
+      ? 'Advocates/Lawyers receive a 21-Day All-Access Free Trial. Auto-payment of ₹5,999 per year will begin on Day 22 via your registered mandate.'
+      : 'Clients receive a 21-Day All-Access Free Trial. Auto-payment of ₹2,999 per year will begin on Day 22 via your registered mandate.',
+    features: isLawyer
       ? [
           'Full Case Files & Evidence Vault Access (Verified Advocates)',
           'Direct Client Case Ingestion & Retainer Management',
@@ -1341,6 +961,10 @@ app.get('/api/membership/status', (req, res) => {
     user,
     membershipActive: user.membershipActive,
     membershipExpiresAt: user.membershipExpiresAt,
+    trialDaysRemaining: user.trialDaysRemaining ?? 21,
+    isTrialActive: user.isTrialActive ?? true,
+    autoPaymentMandateActive: user.autoPaymentMandateActive ?? true,
+    nextBillingDate: user.nextBillingDate,
     requiredPlan,
     invoices: invoices.filter(inv => inv.userId === user.id)
   });
@@ -1348,11 +972,11 @@ app.get('/api/membership/status', (req, res) => {
 
 // Checkout initiation
 app.post('/api/membership/checkout', async (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { paymentMethod } = req.body;
 
   const isLawyer = user.role === 'lawyer';
-  const rawFee = isLawyer ? 3999 : 2999;
+  const rawFee = isLawyer ? 5999 : 2999;
   const baseAmount = Math.round((rawFee / 1.18) * 100) / 100;
   const gstAmount = Math.round((rawFee - baseAmount) * 100) / 100;
 
@@ -1383,9 +1007,9 @@ app.post('/api/membership/checkout', async (req, res) => {
     orderId: internalOrderId,
     razorpayOrderId,
     razorpayKeyId: RAZORPAY_KEY_ID,
-    planId: isLawyer ? 'advocate_monthly' : 'client_annual',
+    planId: isLawyer ? 'advocate_annual' : 'client_annual',
     planName: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass',
-    planDuration: isLawyer ? '1 Month (30 Days)' : '1 Year (365 Days)',
+    planDuration: '1 Year (365 Days)',
     baseAmount,
     gstAmount,
     totalAmount: rawFee,
@@ -1401,7 +1025,7 @@ app.post('/api/membership/checkout', async (req, res) => {
 
 // Verify & Activate Membership Payment
 app.post('/api/membership/verify-payment', (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
   // If Razorpay signature is provided, verify authenticity
@@ -1423,21 +1047,17 @@ app.post('/api/membership/verify-payment', (req, res) => {
   }
 
   const isLawyer = user.role === 'lawyer';
-  const totalAmount = isLawyer ? 3999 : 2999;
+  const totalAmount = isLawyer ? 5999 : 2999;
   const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
   const taxAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
 
   const now = new Date();
   const expiresAtDate = new Date(now);
-  if (isLawyer) {
-    expiresAtDate.setMonth(expiresAtDate.getMonth() + 1);
-  } else {
-    expiresAtDate.setFullYear(expiresAtDate.getFullYear() + 1);
-  }
+  expiresAtDate.setFullYear(expiresAtDate.getFullYear() + 1);
 
   // Activate membership on user
   user.membershipActive = true;
-  user.membershipPlan = isLawyer ? 'advocate_monthly' : 'client_annual';
+  user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
   user.membershipExpiresAt = expiresAtDate.toISOString();
 
   const txnId = razorpay_payment_id || transactionId || `TXN_${paymentMethod || 'UPI'}_${Date.now()}`;
@@ -1450,7 +1070,7 @@ app.post('/api/membership/verify-payment', (req, res) => {
     userName: user.name,
     userRole: user.role,
     planName: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass',
-    planDuration: isLawyer ? '1 Month (30 Days)' : '1 Year (365 Days)',
+    planDuration: '1 Year (365 Days)',
     amount: baseAmount,
     taxAmount: taxAmount,
     totalAmount: totalAmount,
@@ -1467,8 +1087,102 @@ app.post('/api/membership/verify-payment', (req, res) => {
   res.json({
     success: true,
     message: isLawyer
-      ? 'Advocate Practice Subscription (₹3,999/month) activated successfully!'
+      ? 'Advocate Practice Subscription (₹5,999/year) activated successfully!'
       : 'Annual Client Justice Pass (₹2,999/year) activated successfully!',
+    user,
+    invoice: newInvoice
+  });
+});
+
+// Setup / Update Auto-Payment Mandate (Option A: 21-Day Free Trial Mandate Registration)
+app.post('/api/membership/setup-mandate', (req, res) => {
+  const user = getCurrentUser();
+  const { mandateMethod, mandateDetails } = req.body;
+  const isLawyer = user.role === 'lawyer';
+  const planFee = isLawyer ? 5999 : 2999;
+
+  user.autoPaymentMandateActive = true;
+  user.mandateStatus = 'active';
+  user.mandateMethod = mandateMethod || 'upi_autopay';
+  user.mandateDetails = mandateDetails || (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
+  user.autoDebitAmount = planFee;
+  user.trialCancelled = false;
+
+  // Ensure trial dates are set
+  if (!user.trialEndsAt) {
+    const trialEnd = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+    user.trialStartDate = new Date().toISOString();
+    user.trialEndsAt = trialEnd.toISOString();
+    user.nextBillingDate = trialEnd.toISOString();
+  }
+
+  res.json({
+    success: true,
+    message: `Auto-Payment Mandate successfully registered (${user.mandateDetails}). ₹0 charged today. Next billing of ₹${planFee.toLocaleString('en-IN')} scheduled on Day 22.`,
+    user
+  });
+});
+
+// Cancel Auto-Payment Mandate (1-click cancel before Day 22)
+app.post('/api/membership/cancel-mandate', (req, res) => {
+  const user = getCurrentUser();
+  user.autoPaymentMandateActive = false;
+  user.mandateStatus = 'cancelled';
+  user.trialCancelled = true;
+
+  res.json({
+    success: true,
+    message: 'Auto-Payment Mandate has been cancelled. No amount will be charged on Day 22.',
+    user
+  });
+});
+
+// Simulate / Trigger Day 22 Auto-Payment Immediately (for testing or automated cron execution)
+app.post('/api/membership/trigger-day22-autopay', (req, res) => {
+  const user = getCurrentUser();
+  const isLawyer = user.role === 'lawyer';
+  const totalAmount = isLawyer ? 5999 : 2999;
+  const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
+  const taxAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+
+  const now = new Date();
+  const expiresAtDate = new Date(now);
+  expiresAtDate.setFullYear(expiresAtDate.getFullYear() + 1);
+
+  // Mark trial as finished and annual subscription active
+  user.membershipActive = true;
+  user.isTrialActive = false;
+  user.trialDaysRemaining = 0;
+  user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
+  user.membershipExpiresAt = expiresAtDate.toISOString();
+
+  const txnId = `AUTOPAY_D22_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  const invNumber = `JB-AUTO-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const newInvoice: PaymentInvoice = {
+    id: `inv_${Date.now()}`,
+    invoiceNumber: invNumber,
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
+    planName: isLawyer ? 'Advocate Practice Subscription (Auto-Debited)' : 'Annual Client Justice Pass (Auto-Debited)',
+    planDuration: '1 Year (365 Days)',
+    amount: baseAmount,
+    taxAmount: taxAmount,
+    totalAmount: totalAmount,
+    currency: 'INR',
+    status: 'Paid',
+    paymentMethod: user.mandateDetails || 'Razorpay UPI AutoPay (Day 22 Execution)',
+    transactionId: txnId,
+    paidAt: now.toISOString(),
+    expiresAt: expiresAtDate.toISOString()
+  };
+
+  invoices.unshift(newInvoice);
+
+  res.json({
+    success: true,
+    message: `Day 22 Auto-Payment of ₹${totalAmount.toLocaleString('en-IN')} executed successfully via ${user.mandateDetails || 'registered mandate'}! Annual subscription active.`,
     user,
     invoice: newInvoice
   });
@@ -1477,7 +1191,11 @@ app.post('/api/membership/verify-payment', (req, res) => {
 // 5. AI Delay Reduction Engine (Using @google/genai with fallback)
 app.post('/api/ai/delay-analysis', async (req, res) => {
   const { caseId } = req.body;
-  const caseItem = casesStore.find(c => c.id === caseId) || casesStore[0];
+  const caseItem = casesStore.find(c => c.id === caseId) || (casesStore.length > 0 ? casesStore[0] : null);
+
+  if (!caseItem) {
+    return res.status(404).json({ error: 'No case matter found for delay analysis.' });
+  }
 
   try {
     const ai = getAIClient();
@@ -1532,7 +1250,20 @@ app.post('/api/ai/legal-chat', async (req, res) => {
     return res.status(400).json({ error: 'Query is required' });
   }
 
-  const targetLang = langName || (language === 'te' ? 'Telugu' : language === 'hi' ? 'Hindi' : language === 'ta' ? 'Tamil' : 'English');
+  // Whitelist and sanitize language parameter to prevent prompt injection (Addresses CodeQL prompt injection alert)
+  const allowedLanguages = ['English', 'Telugu', 'Hindi', 'Tamil', 'Kannada', 'Marathi', 'Bengali', 'Gujarati', 'Punjabi', 'Malayalam'];
+  let targetLang = 'English';
+  if (langName && typeof langName === 'string' && allowedLanguages.includes(langName.trim())) {
+    targetLang = langName.trim();
+  } else if (language === 'te') {
+    targetLang = 'Telugu';
+  } else if (language === 'hi') {
+    targetLang = 'Hindi';
+  } else if (language === 'ta') {
+    targetLang = 'Tamil';
+  } else if (language === 'kn') {
+    targetLang = 'Kannada';
+  }
 
   try {
     const ai = getAIClient();
@@ -1576,7 +1307,7 @@ Maintain empathetic, accessible, authoritative, and practical advice suited for 
 
 // 7. Voice Case Filing Engine (For Illiterate / Rural / Multi-lingual Citizens)
 app.post('/api/ai/voice-file-case', async (req, res) => {
-  const user = users[currentUserId] || users['client_rohan'];
+  const user = getCurrentUser();
   const { voiceTranscript, languageCode, languageName, autoFile } = req.body;
 
   if (!voiceTranscript) {
@@ -1664,7 +1395,7 @@ Output only valid JSON.`;
       judgeName: 'Hon\'ble Presiding Judge',
       petitioner: `${user.name} (Litigant Petitioner)`,
       respondent: extractedData.respondent,
-      clientId: user.role === 'client' ? user.id : 'client_rohan',
+      clientId: user.id,
       clientName: user.name,
       clientEmail: user.email,
       assignedLawyerId: 'unassigned',
@@ -1719,8 +1450,8 @@ Output only valid JSON.`;
 
 // Platform Statistics (Dynamic calculation from live platform state)
 app.get('/api/analytics', (req, res) => {
-  const verifiedAdvocates = Object.values(users).filter(u => u.role === 'lawyer' && u.isVerifiedLawyer).length;
-  const totalRegisteredAdvocates = Object.values(users).filter(u => u.role === 'lawyer').length;
+  const verifiedAdvocates = Object.values(users).filter(u => u?.role === 'lawyer' && u?.isVerifiedLawyer).length;
+  const totalRegisteredAdvocates = Object.values(users).filter(u => u?.role === 'lawyer').length;
   const totalCases = casesStore.length;
   const activeHearings = casesStore.reduce((acc, c) => acc + (c.hearings ? c.hearings.length : 0), 0);
 
@@ -1743,22 +1474,51 @@ app.get('/api/analytics', (req, res) => {
 // VITE MIDDLEWARE & SERVER STARTUP
 // -------------------------------------------------------------
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.warn('⚠️ Warning: dist directory not found. Please ensure npm run build was executed.');
+    }
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`⚖️ JusticeBridge Full-Stack Server running on port ${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`⚖️ JusticeBridge Full-Stack Server running on http://0.0.0.0:${PORT} (environment: ${isProduction ? 'production' : 'development'})`);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('Server error:', err);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use.`);
+    }
+  });
+
+  process.on('SIGTERM', () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  });
+  process.on('SIGINT', () => {
+    server.close(() => {
+      process.exit(0);
+    });
   });
 }
 

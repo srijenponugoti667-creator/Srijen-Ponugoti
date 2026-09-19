@@ -25,6 +25,9 @@ jobs:
         run: |
           strix -n -t ./ --scan-mode quick
         env:
-          STRIX_LLM: "gemini/gemini-3.5-flash"
+          STRIX_LLM: "gemini/gemini-2.5-flash"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Strix Audit Summary
+        if: always()
+        run: echo "Strix AI Security Audit process completed."

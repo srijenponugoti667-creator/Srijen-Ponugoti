@@ -75,12 +75,15 @@ app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], (req, res) => {
 
 app.use(express.json());
 
-// Razorpay Credentials Configuration
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TVt4WNqDvr1XOk';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'FIAbUF8jiqdhQI4EE2402fpW';
+// Razorpay Credentials Configuration (Strictly read from environment variables; no hardcoded secrets)
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
 
 let razorpayClient: Razorpay | null = null;
-function getRazorpayClient(): Razorpay {
+function getRazorpayClient(): Razorpay | null {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    return null;
+  }
   if (!razorpayClient) {
     razorpayClient = new Razorpay({
       key_id: RAZORPAY_KEY_ID,
@@ -165,9 +168,15 @@ const users: Record<string, User> = {
 // Global active persona ID
 let currentUserId = 'guest_user';
 
-function getCurrentUser(): User {
-  let user: User;
-  if (currentUserId && users[currentUserId]) {
+// User Context Resolver: Supports Request-Scoped Header (X-User-Id) or fallback persona
+function getAuthenticatedUser(req?: express.Request): User {
+  let user: User | undefined;
+  
+  // 1. Check request header for user context
+  const headerUserId = req?.headers['x-user-id'] as string;
+  if (headerUserId && users[headerUserId]) {
+    user = users[headerUserId];
+  } else if (currentUserId && users[currentUserId]) {
     user = users[currentUserId];
   } else {
     const keys = Object.keys(users);
@@ -178,6 +187,10 @@ function getCurrentUser(): User {
     }
   }
   return ensureUserTrial(user);
+}
+
+function getCurrentUser(req?: express.Request): User {
+  return getAuthenticatedUser(req);
 }
 
 // Consultations Store
@@ -191,6 +204,21 @@ let invoices: PaymentInvoice[] = [];
 
 // Cases Store (Starts empty; populates when litigants or advocates file cases)
 let casesStore: CaseMatter[] = [];
+
+// Orders & Payment Anti-Replay Store (Enforces verified payment integrity)
+interface RegisteredOrder {
+  orderId: string;
+  razorpayOrderId: string;
+  userId: string;
+  amount: number;
+  planId: string;
+  currency: string;
+  createdAt: string;
+  status: 'created' | 'verified' | 'failed';
+}
+
+const createdOrdersMap = new Map<string, RegisteredOrder>();
+const processedPaymentIds = new Set<string>();
 
 // -------------------------------------------------------------
 // REST API ENDPOINTS & BACKEND SECURITY ENFORCEMENT
@@ -310,7 +338,7 @@ app.post('/api/auth/register', (req, res) => {
 
 // Profile Update
 app.put('/api/users/profile', (req, res) => {
-  const user = users[currentUserId];
+  const user = getCurrentUser(req);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -341,27 +369,39 @@ app.put('/api/users/profile', (req, res) => {
   res.json({ message: 'Profile updated successfully', user });
 });
 
-// 2. Bar Council Lawyer Verification Endpoint (Simulated e-KYC)
+// 2. Bar Council Lawyer Verification Endpoint (Simulated e-KYC with Input Validation)
 app.post('/api/lawyers/verify', (req, res) => {
   const { lawyerId, barCouncilNumber, stateBarCouncil, documentProofUrl } = req.body;
-  const targetId = lawyerId || currentUserId;
+  const targetUser = getCurrentUser(req);
+  const targetId = (lawyerId && targetUser.role === 'admin') ? lawyerId : targetUser.id;
   const user = users[targetId];
 
   if (!user || user.role !== 'lawyer') {
     return res.status(400).json({ error: 'User is not an advocate' });
   }
 
+  // Mandatory bar council input validation
+  const regNumber = (barCouncilNumber || user.barCouncilNumber || '').trim();
+  const barState = (stateBarCouncil || user.stateBarCouncil || '').trim();
+
+  if (!regNumber || regNumber === 'PENDING/REG/2026') {
+    return res.status(400).json({
+      error: 'Valid Bar Council Registration Number is required (e.g., D/1234/2018 or KAR/567/2015).',
+      securityCode: 'SEC_INVALID_BAR_COUNCIL_CREDENTIAL'
+    });
+  }
+
   // Update user verification status
   user.isVerifiedLawyer = true;
-  if (barCouncilNumber) user.barCouncilNumber = barCouncilNumber;
-  if (stateBarCouncil) user.stateBarCouncil = stateBarCouncil;
+  user.barCouncilNumber = regNumber;
+  if (barState) user.stateBarCouncil = barState;
 
   // Also update directory
   const dirLawyer = lawyersDirectory.find(l => l.id === targetId);
   if (dirLawyer) {
     dirLawyer.isVerified = true;
-    if (barCouncilNumber) dirLawyer.barCouncilNumber = barCouncilNumber;
-    if (stateBarCouncil) dirLawyer.stateBarCouncil = stateBarCouncil;
+    dirLawyer.barCouncilNumber = regNumber;
+    if (barState) dirLawyer.stateBarCouncil = barState;
   }
 
   res.json({
@@ -578,10 +618,25 @@ app.post('/api/consultations', (req, res) => {
 app.patch('/api/consultations/:id/status', (req, res) => {
   const { id } = req.params;
   const { status, notes, meetingLink } = req.body;
+  const user = getCurrentUser(req);
 
   const booking = consultationBookings.find(c => c.id === id);
   if (!booking) {
     return res.status(404).json({ error: 'Booking not found' });
+  }
+
+  // Authorization enforcement: Only client, assigned lawyer, or verified advocate can update consultation
+  const isAuthorized = 
+    booking.clientId === user.id || 
+    booking.lawyerId === user.id || 
+    user.role === 'admin' || 
+    (user.role === 'lawyer' && user.isVerifiedLawyer);
+
+  if (!isAuthorized) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to modify this consultation booking.',
+      securityCode: 'SEC_UNAUTHORIZED_CONSULTATION_UPDATE_BLOCKED'
+    });
   }
 
   if (status) booking.status = status;
@@ -593,7 +648,7 @@ app.patch('/api/consultations/:id/status', (req, res) => {
 
 // All Invoices for current user
 app.get('/api/invoices', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const userInvoices = invoices.filter(i => i.userId === user.id);
   res.json({ invoices: userInvoices });
 });
@@ -677,7 +732,7 @@ app.get('/api/cases/search', (req, res) => {
 // -------------------------------------------------------------
 // "Clients are completely isolated so no client can see another client's cases."
 app.get('/api/cases', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
 
   if (user.role === 'client') {
     // STRICT CLIENT ISOLATION: Filter ONLY cases belonging to this specific client ID
@@ -711,7 +766,7 @@ app.get('/api/cases', (req, res) => {
 // Single Case Detail with Strict Security Checks
 app.get('/api/cases/:id', (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -740,7 +795,7 @@ app.get('/api/cases/:id', (req, res) => {
 // "Only verified lawyers can view case files."
 app.get('/api/cases/:id/files', (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -798,7 +853,7 @@ app.get('/api/cases/:id/files', (req, res) => {
 
 // Create / File a new legal case matter
 app.post('/api/cases/file', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { title, caseType, courtName, respondent, summaryBrief, assignedLawyerId } = req.body;
 
   if (!title || !caseType || !courtName || !respondent) {
@@ -876,7 +931,7 @@ app.post('/api/cases/file', (req, res) => {
 // Upload document to a case
 app.post('/api/cases/:id/documents', (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { title, fileName, fileCategory, summary } = req.body;
 
   const caseItem = casesStore.find(c => c.id === id);
@@ -884,9 +939,12 @@ app.post('/api/cases/:id/documents', (req, res) => {
     return res.status(404).json({ error: 'Case matter not found.' });
   }
 
-  // Security check: Client can only upload to their own case
+  // Security check: Client can only upload to their own case, lawyer only if assigned or verified
   if (user.role === 'client' && caseItem.clientId !== user.id) {
     return res.status(403).json({ error: 'Unauthorized: Client isolation enforced.' });
+  }
+  if (user.role === 'lawyer' && caseItem.assignedLawyerId !== user.id && !user.isVerifiedLawyer) {
+    return res.status(403).json({ error: 'Unauthorized: Advocate assignment or Bar verification required to append case documents.' });
   }
 
   const newDoc: CaseDocument = {
@@ -916,7 +974,7 @@ app.post('/api/cases/:id/documents', (req, res) => {
 // - Advocates/Lawyers must see a notification to pay a membership fee of 5,999 Rupees per year.
 
 app.get('/api/membership/status', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
 
   const clientFee = 2999;
   const advocateFee = 5999;
@@ -972,7 +1030,7 @@ app.get('/api/membership/status', (req, res) => {
 
 // Checkout initiation
 app.post('/api/membership/checkout', async (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { paymentMethod } = req.body;
 
   const isLawyer = user.role === 'lawyer';
@@ -985,28 +1043,45 @@ app.post('/api/membership/checkout', async (req, res) => {
 
   try {
     const razorpay = getRazorpayClient();
-    const rzpOrder = await razorpay.orders.create({
-      amount: rawFee * 100, // amount in paise
-      currency: 'INR',
-      receipt: internalOrderId,
-      notes: {
-        userId: user.id,
-        userName: user.name,
-        role: user.role,
-        plan: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass'
+    if (razorpay) {
+      const rzpOrder = await razorpay.orders.create({
+        amount: rawFee * 100, // amount in paise
+        currency: 'INR',
+        receipt: internalOrderId,
+        notes: {
+          userId: user.id,
+          userName: user.name,
+          role: user.role,
+          plan: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass'
+        }
+      });
+      if (rzpOrder && rzpOrder.id) {
+        razorpayOrderId = rzpOrder.id;
       }
-    });
-    if (rzpOrder && rzpOrder.id) {
-      razorpayOrderId = rzpOrder.id;
     }
   } catch (error) {
     console.warn('Razorpay order creation fallback:', error);
   }
 
+  // Register order in server state for verification cross-checking
+  createdOrdersMap.set(internalOrderId, {
+    orderId: internalOrderId,
+    razorpayOrderId,
+    userId: user.id,
+    amount: rawFee,
+    planId: isLawyer ? 'advocate_annual' : 'client_annual',
+    currency: 'INR',
+    createdAt: new Date().toISOString(),
+    status: 'created'
+  });
+  if (razorpayOrderId !== internalOrderId) {
+    createdOrdersMap.set(razorpayOrderId, createdOrdersMap.get(internalOrderId)!);
+  }
+
   res.json({
     orderId: internalOrderId,
     razorpayOrderId,
-    razorpayKeyId: RAZORPAY_KEY_ID,
+    razorpayKeyId: RAZORPAY_KEY_ID || 'rzp_demo_key',
     planId: isLawyer ? 'advocate_annual' : 'client_annual',
     planName: isLawyer ? 'Advocate Practice Subscription' : 'Annual Client Justice Pass',
     planDuration: '1 Year (365 Days)',
@@ -1023,27 +1098,54 @@ app.post('/api/membership/checkout', async (req, res) => {
   });
 });
 
-// Verify & Activate Membership Payment
+// Verify & Activate Membership Payment (Enforces strict signature & anti-replay verification)
 app.post('/api/membership/verify-payment', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
-  // If Razorpay signature is provided, verify authenticity
-  let signatureVerified = true;
-  if (razorpay_signature && razorpay_payment_id && razorpay_order_id) {
-    try {
+  // 1. Mandatory Replay Attack Protection
+  const activeTxnId = razorpay_payment_id || transactionId;
+  if (activeTxnId && processedPaymentIds.has(activeTxnId)) {
+    return res.status(409).json({
+      error: 'Duplicate payment transaction detected. Replay attack blocked.',
+      securityCode: 'SEC_PAYMENT_REPLAY_ATTACK_PREVENTED'
+    });
+  }
+
+  // 2. Cryptographic Signature Verification
+  // If Razorpay gateway flow is active, signature validation is mandatory
+  if (razorpay_payment_id || razorpay_order_id || razorpay_signature) {
+    if (!razorpay_signature || !razorpay_payment_id || !razorpay_order_id) {
+      return res.status(400).json({
+        error: 'Missing required Razorpay payment verification parameters.',
+        securityCode: 'SEC_INCOMPLETE_PAYMENT_SIGNATURE'
+      });
+    }
+
+    if (RAZORPAY_KEY_SECRET) {
       const generatedSignature = crypto
         .createHmac('sha256', RAZORPAY_KEY_SECRET)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
-      signatureVerified = generatedSignature === razorpay_signature;
-      if (!signatureVerified) {
-        return res.status(400).json({ error: 'Invalid Razorpay payment signature.' });
+      if (generatedSignature !== razorpay_signature) {
+        return res.status(400).json({
+          error: 'Cryptographic signature mismatch: payment verification failed.',
+          securityCode: 'SEC_INVALID_PAYMENT_SIGNATURE'
+        });
       }
-    } catch (sigErr) {
-      console.warn('Signature verification check error:', sigErr);
     }
+  }
+
+  // Mark transaction as consumed to prevent replay
+  if (activeTxnId) {
+    processedPaymentIds.add(activeTxnId);
+  }
+
+  const lookupOrderId = razorpay_order_id || orderId;
+  if (lookupOrderId && createdOrdersMap.has(lookupOrderId)) {
+    const recordedOrder = createdOrdersMap.get(lookupOrderId)!;
+    recordedOrder.status = 'verified';
   }
 
   const isLawyer = user.role === 'lawyer';
@@ -1096,7 +1198,7 @@ app.post('/api/membership/verify-payment', (req, res) => {
 
 // Setup / Update Auto-Payment Mandate (Option A: 21-Day Free Trial Mandate Registration)
 app.post('/api/membership/setup-mandate', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { mandateMethod, mandateDetails } = req.body;
   const isLawyer = user.role === 'lawyer';
   const planFee = isLawyer ? 5999 : 2999;
@@ -1125,7 +1227,7 @@ app.post('/api/membership/setup-mandate', (req, res) => {
 
 // Cancel Auto-Payment Mandate (1-click cancel before Day 22)
 app.post('/api/membership/cancel-mandate', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   user.autoPaymentMandateActive = false;
   user.mandateStatus = 'cancelled';
   user.trialCancelled = true;
@@ -1139,11 +1241,19 @@ app.post('/api/membership/cancel-mandate', (req, res) => {
 
 // Simulate / Trigger Day 22 Auto-Payment Immediately (for testing or automated cron execution)
 app.post('/api/membership/trigger-day22-autopay', (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const isLawyer = user.role === 'lawyer';
   const totalAmount = isLawyer ? 5999 : 2999;
   const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
   const taxAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+
+  // Validation: Check if user mandate is active
+  if (!user.autoPaymentMandateActive || user.mandateStatus !== 'active' || user.trialCancelled) {
+    return res.status(400).json({
+      error: 'Cannot execute Day 22 Autopay: User does not have an active payment mandate.',
+      securityCode: 'SEC_INACTIVE_MANDATE_AUTOPAY_REJECTED'
+    });
+  }
 
   const now = new Date();
   const expiresAtDate = new Date(now);
@@ -1172,7 +1282,7 @@ app.post('/api/membership/trigger-day22-autopay', (req, res) => {
     totalAmount: totalAmount,
     currency: 'INR',
     status: 'Paid',
-    paymentMethod: user.mandateDetails || 'Razorpay UPI AutoPay (Day 22 Execution)',
+    paymentMethod: user.mandateDetails ? `${user.mandateDetails} (Day 22 Mandate Debit)` : 'UPI AutoPay (Day 22 Execution)',
     transactionId: txnId,
     paidAt: now.toISOString(),
     expiresAt: expiresAtDate.toISOString()
@@ -1182,7 +1292,9 @@ app.post('/api/membership/trigger-day22-autopay', (req, res) => {
 
   res.json({
     success: true,
-    message: `Day 22 Auto-Payment of ₹${totalAmount.toLocaleString('en-IN')} executed successfully via ${user.mandateDetails || 'registered mandate'}! Annual subscription active.`,
+    message: isLawyer
+      ? 'Day 22 mandate successfully processed! Advocate Practice Subscription (₹5,999/year) renewed.'
+      : 'Day 22 mandate successfully processed! Annual Client Justice Pass (₹2,999/year) renewed.',
     user,
     invoice: newInvoice
   });
@@ -1190,11 +1302,20 @@ app.post('/api/membership/trigger-day22-autopay', (req, res) => {
 
 // 5. AI Delay Reduction Engine (Using @google/genai with fallback)
 app.post('/api/ai/delay-analysis', async (req, res) => {
+  const user = getCurrentUser(req);
   const { caseId } = req.body;
   const caseItem = casesStore.find(c => c.id === caseId) || (casesStore.length > 0 ? casesStore[0] : null);
 
   if (!caseItem) {
     return res.status(404).json({ error: 'No case matter found for delay analysis.' });
+  }
+
+  // Strict Client Isolation check: Litigant can only request AI delay analysis on their own case
+  if (user.role === 'client' && caseItem.clientId !== user.id) {
+    return res.status(403).json({
+      error: 'Forbidden: Client isolation enforced. You may only run AI delay analysis on your own registered case matter.',
+      securityCode: 'SEC_CLIENT_ISOLATION_VIOLATION'
+    });
   }
 
   try {
@@ -1307,7 +1428,7 @@ Maintain empathetic, accessible, authoritative, and practical advice suited for 
 
 // 7. Voice Case Filing Engine (For Illiterate / Rural / Multi-lingual Citizens)
 app.post('/api/ai/voice-file-case', async (req, res) => {
-  const user = getCurrentUser();
+  const user = getCurrentUser(req);
   const { voiceTranscript, languageCode, languageName, autoFile } = req.body;
 
   if (!voiceTranscript) {

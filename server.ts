@@ -51,7 +51,7 @@ const publicPath = path.resolve(process.cwd(), 'public');
 app.use(express.static(publicPath));
 
 // Service Worker with no-cache headers to ensure immediate client updates
-app.get('/sw.js', (req, res) => {
+app.get('/sw.js', apiLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');

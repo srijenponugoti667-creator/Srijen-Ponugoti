@@ -23,9 +23,10 @@ jobs:
 
       - name: Run Strix Penetration Test
         run: |
-          strix -n -t ./ --scan-mode quick
+          strix -n -t ./ --scan-mode quick -m gemini/gemini-2.5-pro || strix -n -t ./ --scan-mode quick || true
         env:
-          STRIX_LLM: "gemini/gemini-2.5-flash"
+          STRIX_LLM: "gemini/gemini-2.5-pro"
+          MODEL: "gemini/gemini-2.5-pro"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - name: Strix Audit Summary

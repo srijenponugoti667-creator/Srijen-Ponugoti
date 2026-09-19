@@ -2,6 +2,20 @@ import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
+import rateLimit from 'express-rate-limit';
+
+const app = express();
+
+// Protect endpoints against automated bot attacks
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+app.use('/api/', apiLimiter);
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';

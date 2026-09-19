@@ -212,15 +212,35 @@ You can speak or type in any Indian language to receive instant judicial guidanc
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       console.error('Legal AI query error:', err);
+      let localizedFallback = `### Standard Legal Strategy (${selectedLang.name}):
+1. **Governing Statute**: Indian legal matters require strict compliance with prescribed procedural timelines (BNS, CPC 1908, or BNSS).
+2. **Immediate Step**: Serve a formal statutory Legal Demand Notice giving 15–30 days cure period before approaching the court.
+3. **Bar Council Verified Counsel**: Consult an authenticated Advocate via the **Advocate Directory** to file an urgent petition.`;
+
+      if (selectedLang.code === 'ta') {
+        localizedFallback = `### சட்ட ஆலோசனை & வழிகாட்டுதல் (தமிழ்):
+1. **சட்டப் பிரிவுகள்**: உங்கள் பிரச்சனைக்கு இந்திய சட்டம் (BNS, CPC, NI Act) கீழ் முறையான நிவாரணம் பெற முடியும்.
+2. **ஆவணச் சான்றுகள்**: ஒப்பந்தங்கள், வங்கி அறிக்கைகள், சான்றளிக்கப்பட்ட டிஜிட்டல் பதிவுகளைத் தயாராக வைத்திருக்கவும்.
+3. **அடுத்த கட்ட நடவடிக்கை**: எதிர் தரப்பினருக்கு 15 முதல் 30 நாட்கள் அவகாசத்துடன் வழக்கறிஞர் மூலம் சட்டப்பூர்வ டிமாண்ட் நோட்டீஸ் அனுப்பவும்.
+4. **வழக்கறிஞர் கலந்தாய்வு**: உயர்நீதிமன்றம் அல்லது மாவட்ட நீதிமன்றத்தில் மனு தாக்கல் செய்ய சரிபார்க்கப்பட்ட வழக்கறிஞரை அணுகவும்.`;
+      } else if (selectedLang.code === 'te') {
+        localizedFallback = `### చట్టపరమైన సలహా మరియు కార్యాచరణ ప్రణాళిక (తెలుగు):
+1. **వర్తించే చట్టాలు**: మీ సమస్యకు భారతీయ చట్టాలు (BNS, CPC, NI Act) కింద తగిన న్యాయ రక్షణ ఉంది.
+2. **డాక్యుమెంటేషన్**: ఒరిజినల్ ఒప్పందాలు, బ్యాంక్ స్టేట్‌మెంట్లు మరియు సాక్ష్యాల ధృవీకరణ పత్రాలు సిద్ధం చేసుకోండి.
+3. **తక్షణ చర్య**: బార్ కౌన్సిల్ నమోదిత న్యాయవాది ద్వారా ఎదుటి పక్షానికి లీగల్ డిమాండ్ నోటీసు జారీ చేయండి.`;
+      } else if (selectedLang.code === 'hi') {
+        localizedFallback = `### कानूनी रणनीति एवं विधिक सलाह (हिंदी):
+1. **लागू धाराएं**: आपके मामले में भारतीय न्याय संहिता (BNS), CPC अथवा संबंधित कानूनों के तहत पूर्ण विधिक सुरक्षा प्राप्त है।
+2. **साक्ष्य संकलन**: मूल अनुबंध, बैंक खाते के विवरण, डिजिटल पत्राचार व गवाहों के शपथ पत्र सुरक्षित रखें।
+3. **विधिक नोटिस**: किसी प्रमाणित अधिवक्ता के माध्यम से विपक्षी दल को 15-30 दिनों का विधिवत लीगल नोटिस जारी करें।`;
+      }
+
       const fallbackMsg: ChatMessage = {
         id: `ast_${Date.now()}`,
         sender: 'assistant',
-        text: `### Standard Legal Strategy (${selectedLang.name}):
-1. **Governing Statute**: Indian legal matters require strict compliance with prescribed procedural timelines (BNS, CPC 1908, or BNSS).
-2. **Immediate Step**: Serve a formal statutory Legal Demand Notice giving 15–30 days cure period before approaching the court.
-3. **Bar Council Verified Counsel**: Consult an authenticated Advocate via the **Advocate Directory** to file an urgent petition.`,
+        text: localizedFallback,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: 'JusticeBridge Statutory Knowledgebase',
+        source: `JusticeBridge Statutory Engine (${selectedLang.name})`,
         lang: selectedLang.code
       };
       setMessages(prev => [...prev, fallbackMsg]);

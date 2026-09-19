@@ -96,10 +96,39 @@ function getRazorpayClient(): Razorpay | null {
 // Initialize Gemini API client lazily
 let aiClient: GoogleGenAI | null = null;
 function getAIClient(): GoogleGenAI | null {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!aiClient && apiKey) {
+    aiClient = new GoogleGenAI({ apiKey });
   }
   return aiClient;
+}
+
+// Resilient Gemini multi-model executor with automatic fallback
+async function generateGeminiWithFallback(
+  ai: GoogleGenAI,
+  contents: any,
+  config?: any
+): Promise<{ text: string; modelUsed: string }> {
+  const models = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config
+      });
+      if (response && response.text) {
+        return { text: response.text, modelUsed: model };
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Model ${model} attempt notice:`, err?.message || err);
+    }
+  }
+
+  throw lastError || new Error('All Gemini model candidates exhausted');
 }
 
 // Helper to ensure 21-Day Free Trial & Auto-Payment Mandate (Option A)
@@ -1333,17 +1362,14 @@ Bottleneck Reason: ${caseItem.bottleneckReason || 'Procedural notice wait and ev
 
 Provide a high-impact, actionable 3-point strategy to expedite this hearing, eliminate adjournments, and reduce case resolution timeline. Keep responses concise, authoritative, and practical.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
+      const response = await generateGeminiWithFallback(ai, prompt);
 
       return res.json({
         analysis: response.text,
         caseNumber: caseItem.caseNumber,
         delayDays: caseItem.delayDays,
         riskScore: caseItem.delayRiskScore,
-        source: 'Gemini 2.5 Flash Judicial Engine'
+        source: `JusticeBridge AI Engine (${response.modelUsed})`
       });
     }
   } catch (error) {
@@ -1362,6 +1388,77 @@ Provide a high-impact, actionable 3-point strategy to expedite this hearing, eli
     source: 'JusticeBridge Delay Reduction Playbook'
   });
 });
+
+// Helper for authentic vernacular legal advice when offline or during connectivity drops
+function getLocalizedLegalFallback(targetLang: string, query: string): string {
+  const isCheque = /காசோலை|பவுன்ஸ்|செக்|చెక్కు|బౌన్స్|चेक|बाउंस|cheque|bounce|138/i.test(query);
+  const isProperty = /நில|சொத்து|భూమి|ఆస్తి|जमीन|संपत्ति|land|property|trespass/i.test(query);
+
+  if (targetLang === 'Tamil') {
+    if (isCheque) {
+      return `### காசோலை பவுன்ஸ் சட்ட ஆலோசனை & வழிகாட்டுதல் (Section 138 NI Act):
+1. **சட்டப் பிரிவு (Section 138 NI Act)**: வங்கியில் போதிய பணமில்லாமல் காசோலை திரும்பப் பெறப்பட்டால், அது 2 ஆண்டுகள் வரை சிறைத் தண்டனை அல்லது காசோலை தொகையை விட இரண்டு மடங்கு வரை அபராதம் விதிக்கக்கூடிய குற்றமாகும்.
+2. **வங்கி மெமோ (Bank Return Memo)**: வங்கி காசோலையை நிராகரித்ததற்கான காரணக் கடிதத்தை (Return Memo) பாதுகாப்பாகப் பெறவும்.
+3. **சட்ட அறிவிப்பு (30 Days Legal Notice)**: வங்கி மெமோ கிடைத்த 30 நாட்களுக்குள் உங்கள் வழக்கறிஞர் மூலம் எதிர் தரப்பினருக்கு 15 நாட்கள் அவகாசம் கொடுத்து முறையான சட்டப்பூர்வ அறிவிப்பு அனுப்ப வேண்டும்.
+4. **நீதிமன்ற வழக்கு தாக்கல்**: 15 நாட்களுக்குள் பணம் தராவிட்டால், அடுத்த 30 நாட்களுக்குள் குற்றவியல் நடுவர் நீதிமன்றத்தில் (Judicial Magistrate Court) வழக்கு தாக்கல் செய்ய வேண்டும்.`;
+    }
+    return `### சட்ட உத்தி & நடைமுறை வழிகாட்டுதல் (தமிழ்):
+1. **சட்டப் பிரிவுகள்**: உங்கள் கோரிக்கைக்கு இந்திய சட்டங்கள் (BNS, CPC, அல்லது தொடர்புடைய சிறப்புச் சட்டங்கள்) கீழ் நேரடித் தீர்வு பெற முடியும்.
+2. **ஆவணச் சான்றுகள்**: அசல் ஒப்பந்தங்கள், சான்றளிக்கப்பட்ட வங்கிப் பதிவுகள் மற்றும் டிஜிட்டல் ஆவணங்களைச் சேகரித்து வைக்கவும்.
+3. **அடுத்த கட்ட நடவடிக்கை**: எதிர் தரப்பினருக்கு 15 முதல் 30 நாட்கள் கால அவகாசத்துடன் வழக்கறிஞர் மூலம் சட்ட அறிவிப்பு (Legal Demand Notice) அனுப்பவும்.
+4. **வழக்கறிஞர் உதவி**: உயர்நீதிமன்றம் அல்லது மாவட்ட நீதிமன்றத்தில் மனு தாக்கல் செய்ய சரிபார்க்கப்பட்ட வழக்கறிஞரை அணுகவும்.`;
+  }
+
+  if (targetLang === 'Telugu') {
+    if (isCheque) {
+      return `### చెక్ బౌన్స్ న్యాయ సలహా & మార్గదర్శకాలు (Section 138 NI Act):
+1. **చట్టపరమైన సెక్షన్ (Section 138 NI Act)**: బ్యాంకులో తగినంత నిధులు లేక చెక్ బౌన్స్ అయితే అది నేరం. దీని కింద 2 సంవత్సరాల వరకు జైలు శిక్ష లేదా చెక్ మొత్తానికి రెట్టింపు జరిమానా విధించవచ్చు.
+2. **బ్యాంక్ రిటర్న్ మెమో**: చెక్ బౌన్స్ అయినట్లు బ్యాంక్ జారీ చేసిన అధికారిక రిటర్న్ మెమోను పొందండి.
+3. **లీగల్ నోటీసు (30 Days Demand Notice)**: మెమో అందుకున్న 30 రోజుల్లోగా లాయర్ ద్వారా 15 రోజుల గడువుతో లీగల్ డిమాండ్ నోటీసు పంపించాలి.
+4. **కోర్టులో ఫిర్యాదు**: 15 రోజుల్లో చెల్లింపు చేయకపోతే, తదుపరి 30 రోజుల్లో మేజిస్ట్రేట్ కోర్టులో కేసు నమోదు చేయవచ్చు.`;
+    }
+    return `### చట్టపరమైన సలహా మరియు కార్యాచరణ ప్రణాళిక (తెలుగు):
+1. **వర్తించే చట్టాలు**: మీ సమస్యకు భారతీయ చట్టాలు (BNS, CPC, ప్రత్యేక చట్టాలు) కింద తగిన న్యాయ రక్షణ ఉంది.
+2. **డాక్యుమెంటేషన్**: ఒరిజినల్ ఒప్పందాలు, బ్యాంక్ స్టేట్‌మెంట్లు, మరియు సాక్ష్యాల ధృవీకరణ పత్రాలు సిద్ధం చేసుకోండి.
+3. **తక్షణ చర్య**: బార్ కౌన్సిల్ నమోదిత న్యాయవాది ద్వారా ఎదుటి పక్షానికి లీగల్ డిమాండ్ నోటీసు జారీ చేయండి.
+4. **పిటిషన్ దాఖలు**: వివాద పరిష్కారం కోసం సంబంధిత కోర్టులో అత్యవసర ఇంజంక్షన్ లేదా కేవియట్ దాఖలు చేయండి.`;
+  }
+
+  if (targetLang === 'Hindi') {
+    if (isCheque) {
+      return `### चेक बाउंस कानूनी सलाह एवं प्रक्रिया (Section 138 NI Act):
+1. **लागू धारा (Section 138 NI Act)**: बैंक खाते में अपर्याप्त राशि के कारण चेक बाउंस होना एक दंडनीय अपराध है, जिसमें 2 वर्ष तक का कारावास या चेक राशि का दोगुना जुर्माना हो सकता है।
+2. **बैंक रिटर्न मेमो**: बैंक से चेक अनादरण की आधिकारिक पर्ची (Return Memo) तुरंत प्राप्त करें।
+3. **वैधानिक लीगल नोटिस (30 Days Notice)**: मेमो मिलने के 30 दिनों के भीतर अधिवक्ता के माध्यम से 15 दिनों का वैधानिक लीगल नोटिस प्रेषित करें।
+4. **अदालत में परिवाद**: नोटिस अवधि समाप्त होने के 30 दिनों के अंदर सक्षम न्यायिक मजिस्ट्रेट अदालत में परिवाद (Complaint) दर्ज करें।`;
+    }
+    return `### कानूनी रणनीति एवं विधिक सलाह (हिंदी):
+1. **लागू कानूनी धाराएं**: आपके मामले में भारतीय न्याय संहिता (BNS), CPC अथवा संबंधित कानूनों के तहत पूर्ण विधिक सुरक्षा प्राप्त है।
+2. **साक्ष्य संकलन**: मूल अनुबंध, बैंक खाते के विवरण, डिजिटल पत्राचार व गवाहों के शपथ पत्र सुरक्षित रखें।
+3. **विधिक नोटिस**: किसी प्रमाणित अधिवक्ता के माध्यम से विपक्षी दल को 15-30 दिनों का विधिवत लीगल नोटिस जारी करें।
+4. **न्यायालयीन कदम**: समय सीमा समाप्त होने से पूर्व न्यायालय में कैविएट अथवा याचिका दायर करें।`;
+  }
+
+  if (targetLang === 'Kannada') {
+    return `### ಕಾನೂನು ಸಲಹೆ ಮತ್ತು ಮಾರ್ಗದರ್ಶನ (ಕನ್ನಡ):
+1. **ಕಾನೂನು ವಿಧಿಗಳು**: ಭಾರತೀಯ ಕಾನೂನು (BNS, CPC, NI Act) ಅಡಿಯಲ್ಲಿ ನಿಮ್ಮ ಹಕ್ಕನ್ನು ರಕ್ಷಿಸಲು ಸಂಪೂರ್ಣ ಅವಕಾಶವಿದೆ.
+2. **ದಾಖಲೆಗಳು**: ಮೂಲ ಒಪ್ಪಂದಗಳು, ಬ್ಯಾಂಕ್ ದಾಖಲೆಗಳು ಹಾಗೂ ಡಿಜಿಟಲ್ ಪುರಾವೆಗಳನ್ನು ಸಿದ್ಧವಾಗಿಟ್ಟುಕೊಳ್ಳಿ.
+3. **ಮುಂದಿನ ಕ್ರಮ**: ಬಾರ್ ಕೌನ್ಸಿಲ್ ನೋಂದಾಯಿತ ವಕೀಲರ ಮೂಲಕ ಎದುರು ಕಕ್ಷಿದಾರರಿಗೆ 15-30 ದಿನಗಳ ಕಾಲಾವಕಾಶವಿರುವ ಲೀಗಲ್ ನೋಟಿಸ್ ಕಳುಹಿಸಿ.`;
+  }
+
+  if (targetLang === 'Malayalam') {
+    return `### നിയമോപദേശവും മാർഗ്ഗനിർദ്ദേശങ്ങളും (മലയാളം):
+1. **നിയമപരമായ വകുപ്പുകൾ**: നിങ്ങളുടെ പ്രശ്നത്തിൽ ഇന്ത്യൻ നിയമപ്രകാരം (BNS, CPC, NI Act) ശക്തമായ പരിഹാരം ലഭ്യമാണ്.
+2. **രേഖകൾ**: യഥാർത്ഥ കരാറുകൾ, ബാങ്ക് രേഖകൾ, തെളിവുകൾ എന്നിവ ഭദ്രമായി സൂക്ഷിക്കുക.
+3. **അടിയന്തര നടപടി**: വക്കീൽ മുഖേന എതിർകക്ഷിക്ക് നിയമാനുസൃത ലീഗൽ നോട്ടീസ് അയക്കുക.`;
+  }
+
+  // Default English fallback
+  return `### Legal Strategy & Statutory Review (English):
+1. **Statutory Framework**: Indian law stipulates strict adherence to pre-institution notice periods under BNS, CPC, or NI Act Section 138.
+2. **Documentary Evidence**: Collate certified digital logs, stamp duty verified agreements, and witness statements.
+3. **Immediate Action**: Issue a formal 15–30 day statutory Demand Notice and consult a Bar Council verified advocate to file in the competent court.`;
+}
 
 // 6. Interactive AI Legal Assistant Chat with Multilingual Support
 app.post('/api/ai/legal-chat', async (req, res) => {
@@ -1384,6 +1481,10 @@ app.post('/api/ai/legal-chat', async (req, res) => {
     targetLang = 'Tamil';
   } else if (language === 'kn') {
     targetLang = 'Kannada';
+  } else if (language === 'ml') {
+    targetLang = 'Malayalam';
+  } else if (language === 'mr') {
+    targetLang = 'Marathi';
   }
 
   try {
@@ -1391,38 +1492,34 @@ app.post('/api/ai/legal-chat', async (req, res) => {
     if (ai) {
       const systemInstruction = `You are JusticeBridge's expert Indian Legal AI Counsel.
 You specialize in Indian Law, Constitution of India, Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), Civil Procedure Code (CPC), Commercial Courts Act, NI Act, and High Court / Supreme Court procedural rules.
-Respond comprehensively in the user's requested language: "${targetLang}" (along with English legal section citations).
-Always structure responses clearly with:
-1. **Applicable Legal Provisions & Sections (లా సెక్షన్లు / कानूनी धाराएं)**
+
+CRITICAL MANDATE: You MUST write your ENTIRE explanation, headings, legal advice, and action steps IN THE USER'S REQUESTED LANGUAGE: "${targetLang}" (using its native script e.g. Tamil script for Tamil, Telugu script for Telugu, Devanagari for Hindi, etc.). Do NOT output the explanation in English. Only statutory act and section names/numbers (e.g., "Section 138 NI Act" or "BNS Section 329") may retain standard legal citation format.
+
+Structure your response clearly with:
+1. **Applicable Legal Provisions & Sections**
 2. **Procedural Requirements & Mandatory Notices**
 3. **Strategic Next Steps & Timelines**
 4. **Actionable Checklist for the Litigant or Advocate**
-Maintain empathetic, accessible, authoritative, and practical advice suited for both ordinary citizens and lawyers.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: query,
-        config: {
-          systemInstruction,
-        }
+Maintain empathetic, accessible, authoritative, and practical advice suited for ordinary citizens in ${targetLang}.`;
+
+      const response = await generateGeminiWithFallback(ai, `User Query in ${targetLang}: ${query}`, {
+        systemInstruction,
       });
 
       return res.json({
         reply: response.text,
-        model: 'Gemini 2.5 Flash Multilingual Judicial AI'
+        model: `JusticeBridge AI Counsel (${targetLang} • ${response.modelUsed})`
       });
     }
   } catch (error) {
     console.error('Gemini Chat API error:', error);
   }
 
-  // Fallback intelligent response
+  // Fallback intelligent response in target native language
   res.json({
-    reply: `### Legal Strategy & Statutory Review:
-1. **Statutory Framework**: For "${query.slice(0, 80)}...", Indian law stipulates strict adherence to pre-institution mediation or statutory notice periods (Sec 80 CPC / Sec 138 NI Act / BNS).
-2. **Documentary Evidence**: Collate certified digital logs, stamp duty verified agreements, and witness statements.
-3. **Immediate Action**: Generate a formal Demand Notice and consult a Bar Council verified advocate to file an urgent Caveat or Interim Petition.`,
-    model: 'JusticeBridge Statutory AI Engine'
+    reply: getLocalizedLegalFallback(targetLang, query),
+    model: `JusticeBridge Statutory AI Engine (${targetLang})`
   });
 });
 
@@ -1433,6 +1530,15 @@ app.post('/api/ai/voice-file-case', async (req, res) => {
 
   if (!voiceTranscript) {
     return res.status(400).json({ error: 'Voice transcript is required' });
+  }
+
+  let nativeSpokenSummary = 'உங்கள் குரல் வாக்குமூலத்தின் அடிப்படையில் வழக்கு விவரங்கள் வெற்றிகரமாக பதிவு செய்யப்பட்டன.';
+  if (languageName === 'Telugu' || languageCode === 'te') {
+    nativeSpokenSummary = 'మీరు చెప్పిన వివరాల ఆధారంగా కేసు ప్రాథమిక ముసాయిదా మరియు రిజిస్ట్రేషన్ సిద్ధమైంది.';
+  } else if (languageName === 'Hindi' || languageCode === 'hi') {
+    nativeSpokenSummary = 'आपके बोले गए विवरण के आधार पर कानूनी याचिका का मसौदा सफलतापूर्वक तैयार कर लिया गया है।';
+  } else if (languageName === 'Kannada' || languageCode === 'kn') {
+    nativeSpokenSummary = 'ನಿಮ್ಮ ಧ್ವನಿ ಹೇಳಿಕೆಯ ಆಧಾರದ ಮೇಲೆ ನ್ಯಾಯಾಲಯದ ಅರ್ಜಿಯನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಸಿದ್ಧಪಡಿಸಲಾಗಿದೆ.';
   }
 
   let extractedData = {
@@ -1448,7 +1554,7 @@ app.post('/api/ai/voice-file-case', async (req, res) => {
       'Unlawful interference / dispute reported by petitioner.',
       'Urgent judicial intervention prayed for.'
     ],
-    spokenSummaryInNativeLang: `మీరు చెప్పిన వివరాల ఆధారంగా కేసు ప్రాథమిక ముసాయిదా సిద్ధమైంది.`
+    spokenSummaryInNativeLang: nativeSpokenSummary
   };
 
   try {
@@ -1475,12 +1581,8 @@ Extract and formulate a complete, legally sound case petition structure in JSON 
 
 Output only valid JSON.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: extractionPrompt,
-        config: {
-          responseMimeType: 'application/json'
-        }
+      const response = await generateGeminiWithFallback(ai, extractionPrompt, {
+        responseMimeType: 'application/json'
       });
 
       if (response.text) {

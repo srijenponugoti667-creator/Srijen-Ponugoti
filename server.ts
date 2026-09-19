@@ -307,6 +307,12 @@ app.get('/api/auth/current-user', (req, res) => {
 
 app.post('/api/auth/switch-persona', (req, res) => {
   const { userId } = req.body;
+  if (typeof userId !== 'string' || userId.length === 0) {
+    return res.status(400).json({ error: 'Invalid userId format.' });
+  }
+  if (userId === '__proto__' || userId === 'constructor' || userId === 'prototype') {
+    return res.status(400).json({ error: 'Invalid userId value.' });
+  }
   if (!users[userId]) {
     return res.status(404).json({ error: 'User profile not found in registry.' });
   }

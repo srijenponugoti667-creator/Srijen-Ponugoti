@@ -4,12 +4,20 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import rateLimit from 'express-rate-limit';
 import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+const staticFallbackLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Razorpay Credentials Configuration
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TVt4WNqDvr1XOk';
@@ -1738,7 +1746,7 @@ async function startServer() {
   } else {
     const distPath = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', staticFallbackLimiter, (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

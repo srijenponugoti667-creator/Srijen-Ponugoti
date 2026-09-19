@@ -153,13 +153,20 @@ function ensureUserTrial(user: User): User {
     user.membershipExpiresAt = trialEnd.toISOString();
   }
 
-  // Calculate dynamic days remaining
+  // Calculate dynamic days remaining with consistent expiry enforcement
   if (user.trialEndsAt) {
     const msRemaining = new Date(user.trialEndsAt).getTime() - Date.now();
     const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
     user.trialDaysRemaining = daysRemaining;
     user.isTrialActive = daysRemaining > 0 && !user.trialCancelled;
     user.autoDebitAmount = isLawyer ? 5999 : 2999;
+
+    // Enforce consistent expiry: If trial has ended and user has not paid for annual membership, revoke active status
+    if (daysRemaining <= 0) {
+      if (user.membershipExpiresAt && new Date(user.membershipExpiresAt).getTime() <= Date.now()) {
+        user.membershipActive = false;
+      }
+    }
   }
 
   return user;
@@ -194,28 +201,50 @@ const users: Record<string, User> = {
   guest_user: defaultGuestUser
 };
 
-// Global active persona ID
-let currentUserId = 'guest_user';
+// -------------------------------------------------------------
+// VERIFIED CRYPTOGRAPHIC SESSIONS STORE (Anti-Spoofing Identity Engine)
+// -------------------------------------------------------------
+interface SessionRecord {
+  token: string;
+  userId: string;
+  createdAt: number;
+  expiresAt: number;
+}
+const sessionStore = new Map<string, SessionRecord>();
 
-// User Context Resolver: Supports Request-Scoped Header (X-User-Id) or fallback persona
+function createSessionToken(userId: string): string {
+  const token = `jb_sess_${crypto.randomBytes(32).toString('hex')}`;
+  sessionStore.set(token, {
+    token,
+    userId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30-day session
+  });
+  return token;
+}
+
+// User Context Resolver: Resolves verified cryptographic session token
+// Arbitrary header spoofing (X-User-Id) is strictly eliminated
 function getAuthenticatedUser(req?: express.Request): User {
-  let user: User | undefined;
-  
-  // 1. Check request header for user context
-  const headerUserId = req?.headers['x-user-id'] as string;
-  if (headerUserId && users[headerUserId]) {
-    user = users[headerUserId];
-  } else if (currentUserId && users[currentUserId]) {
-    user = users[currentUserId];
-  } else {
-    const keys = Object.keys(users);
-    if (keys.length > 0 && users[keys[0]]) {
-      user = users[keys[0]];
-    } else {
-      user = defaultGuestUser;
+  if (req) {
+    let token: string | undefined;
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.headers['x-session-token']) {
+      token = req.headers['x-session-token'] as string;
+    }
+
+    if (token && sessionStore.has(token)) {
+      const session = sessionStore.get(token)!;
+      if (session.expiresAt > Date.now() && users[session.userId]) {
+        return ensureUserTrial(users[session.userId]);
+      }
     }
   }
-  return ensureUserTrial(user);
+
+  // Fallback to default guest user with strictly client-tier isolation
+  return ensureUserTrial(defaultGuestUser);
 }
 
 function getCurrentUser(req?: express.Request): User {
@@ -253,11 +282,25 @@ const processedPaymentIds = new Set<string>();
 // REST API ENDPOINTS & BACKEND SECURITY ENFORCEMENT
 // -------------------------------------------------------------
 
-// 1. Get Current User / Switch Persona
+// 1. Get Current User / Issue Verified Session
 app.get('/api/auth/current-user', (req, res) => {
-  const user = getCurrentUser();
+  const user = getAuthenticatedUser(req);
+  // Ensure an authenticated session token exists for this user
+  let token: string | undefined;
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  } else if (req.headers['x-session-token']) {
+    token = req.headers['x-session-token'] as string;
+  }
+
+  if (!token || !sessionStore.has(token)) {
+    token = createSessionToken(user.id);
+  }
+
   res.json({
     user: user || null,
+    sessionToken: token,
     availablePersonas: Object.values(users)
   });
 });
@@ -265,16 +308,17 @@ app.get('/api/auth/current-user', (req, res) => {
 app.post('/api/auth/switch-persona', (req, res) => {
   const { userId } = req.body;
   if (!users[userId]) {
-    return res.status(404).json({ error: 'Persona not found' });
+    return res.status(404).json({ error: 'User profile not found in registry.' });
   }
-  currentUserId = userId;
+  const sessionToken = createSessionToken(userId);
   res.json({
-    message: 'Switched persona successfully',
-    user: users[currentUserId]
+    message: 'Verified session established successfully',
+    user: users[userId],
+    sessionToken
   });
 });
 
-// Auth Registration (New Client or Advocate)
+// Auth Registration (Strictly restricted to 'client' and 'lawyer' roles)
 app.post('/api/auth/register', (req, res) => {
   const { name, email, role, phone, barCouncilNumber, stateBarCouncil, practiceLocation, yearsExperience, specialization, consultationFee, bio } = req.body;
 
@@ -282,15 +326,31 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json({ error: 'Name, email, and role are required' });
   }
 
+  // RESTRICT REGISTRATION ROLES: Only 'client' and 'lawyer' are permitted. Never 'admin'.
+  const allowedRoles = ['client', 'lawyer'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({
+      error: 'Privilege escalation rejected: Self-registration is restricted exclusively to "client" and "lawyer" roles.',
+      securityCode: 'SEC_UNAUTHORIZED_ROLE_REGISTRATION'
+    });
+  }
+
+  // Sanitize name and email inputs
+  const sanitizedName = String(name).trim().substring(0, 100);
+  const sanitizedEmail = String(email).trim().toLowerCase().substring(0, 100);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
+    return res.status(400).json({ error: 'Invalid email address format.' });
+  }
+
   const newId = `${role}_${Date.now()}`;
   const isLawyer = role === 'lawyer';
 
   const newUser: User = {
     id: newId,
-    name,
-    email,
-    role,
-    phone: phone || '+91 98000 00000',
+    name: sanitizedName,
+    email: sanitizedEmail,
+    role: role as 'client' | 'lawyer',
+    phone: phone ? String(phone).trim().substring(0, 20) : '+91 98000 00000',
     isVerifiedLawyer: false, // New lawyers need to complete e-KYC
     barCouncilNumber: barCouncilNumber || (isLawyer ? 'PENDING/REG/2026' : undefined),
     stateBarCouncil: stateBarCouncil || (isLawyer ? 'Bar Council of Delhi' : undefined),
@@ -322,7 +382,7 @@ app.post('/api/auth/register', (req, res) => {
   };
 
   users[newId] = newUser;
-  currentUserId = newId;
+  const sessionToken = createSessionToken(newId);
 
   if (isLawyer) {
     lawyersDirectory.push({
@@ -361,7 +421,8 @@ app.post('/api/auth/register', (req, res) => {
 
   res.status(201).json({
     message: 'Account registered successfully',
-    user: newUser
+    user: newUser,
+    sessionToken
   });
 });
 
@@ -765,7 +826,21 @@ app.get('/api/cases', (req, res) => {
 
   if (user.role === 'client') {
     // STRICT CLIENT ISOLATION: Filter ONLY cases belonging to this specific client ID
-    const isolatedClientCases = casesStore.filter(c => c.clientId === user.id);
+    // Documents are summarized in list view to prevent data leakage
+    const isolatedClientCases = casesStore
+      .filter(c => c.clientId === user.id)
+      .map(c => ({
+        ...c,
+        documents: c.documents.map(d => ({
+          id: d.id,
+          title: d.title,
+          fileCategory: d.fileCategory,
+          uploadedAt: d.uploadedAt,
+          pageCount: d.pageCount,
+          isRestricted: d.isRestricted
+        }))
+      }));
+
     return res.json({
       cases: isolatedClientCases,
       isolationMode: 'STRICT_CLIENT_ISOLATION_ENFORCED',
@@ -775,10 +850,25 @@ app.get('/api/cases', (req, res) => {
   }
 
   if (user.role === 'lawyer') {
-    // Lawyer view: Cases where this lawyer is assigned, or case matters open for advocate review
-    const lawyerCases = casesStore.filter(c =>
-      c.assignedLawyerId === user.id || user.isVerifiedLawyer
-    );
+    // Lawyer view: Cases where this lawyer is explicitly assigned, or verified advocate review
+    const lawyerCases = casesStore
+      .filter(c => c.assignedLawyerId === user.id || (user.isVerifiedLawyer && c.assignedLawyerId === 'unassigned'))
+      .map(c => {
+        const isAssigned = c.assignedLawyerId === user.id;
+        return {
+          ...c,
+          documents: c.documents.map(d => ({
+            id: d.id,
+            title: d.title,
+            fileCategory: d.fileCategory,
+            uploadedAt: d.uploadedAt,
+            pageCount: d.pageCount,
+            isRestricted: d.isRestricted,
+            ...(isAssigned && user.isVerifiedLawyer ? { documentHash: d.documentHash } : {})
+          }))
+        };
+      });
+
     return res.json({
       cases: lawyerCases,
       isolationMode: 'ADVOCATE_JURISDICTION_VIEW',
@@ -788,11 +878,11 @@ app.get('/api/cases', (req, res) => {
     });
   }
 
-  // Admin / General fallback
+  // Admin view
   res.json({ cases: casesStore, isolationMode: 'ADMIN_FULL' });
 });
 
-// Single Case Detail with Strict Security Checks
+// Single Case Detail with Strict Security Checks & Document Sanitization
 app.get('/api/cases/:id', (req, res) => {
   const { id } = req.params;
   const user = getCurrentUser(req);
@@ -802,7 +892,7 @@ app.get('/api/cases/:id', (req, res) => {
     return res.status(404).json({ error: 'Case matter not found in judicial registry.' });
   }
 
-  // ENFORCE CLIENT ISOLATION
+  // 1. ENFORCE STRICT CLIENT ISOLATION
   if (user.role === 'client' && caseItem.clientId !== user.id) {
     return res.status(403).json({
       error: 'Access Denied: Client Isolation Policy Enforced.',
@@ -811,17 +901,61 @@ app.get('/api/cases/:id', (req, res) => {
     });
   }
 
-  // Return case details (documents metadata included, but file content restricted)
+  // 2. ENFORCE ADVOCATE ASSIGNMENT / JURISDICTION
+  const isAssignedLawyer = user.role === 'lawyer' && caseItem.assignedLawyerId === user.id;
+  const isVerifiedAdvocate = user.role === 'lawyer' && user.isVerifiedLawyer;
+
+  if (user.role === 'lawyer' && !isAssignedLawyer && !isVerifiedAdvocate) {
+    return res.status(403).json({
+      error: 'Access Denied: Case Assignment Required.',
+      message: 'You are not the assigned counsel for this matter and do not possess verified Bar Council jurisdiction.',
+      securityCode: 'SEC_ADVOCATE_UNASSIGNED_BLOCKED'
+    });
+  }
+
+  // 3. PREVENT RESTRICTED DOCUMENT LEAKAGE
+  // Strip confidential advocate work product from client responses
+  // Only fully assigned and verified advocates receive confidential document hashes and discovery attachments
+  const canViewRestrictedFiles = Boolean((isAssignedLawyer && user.isVerifiedLawyer) || user.role === 'admin');
+
+  const sanitizedDocuments = caseItem.documents
+    .filter(doc => {
+      // If user is client, only show non-restricted filings or documents they uploaded
+      if (user.role === 'client') {
+        return !doc.isRestricted || doc.uploadedBy.includes(user.name);
+      }
+      return true;
+    })
+    .map(doc => {
+      if (!canViewRestrictedFiles && doc.isRestricted) {
+        return {
+          id: doc.id,
+          title: doc.title,
+          fileCategory: doc.fileCategory,
+          uploadedAt: doc.uploadedAt,
+          pageCount: doc.pageCount,
+          isRestricted: true,
+          summary: 'Restricted advocate work product. Accessible only to verified presiding advocate.',
+          documentHash: undefined
+        };
+      }
+      return doc;
+    });
+
+  const sanitizedCase = {
+    ...caseItem,
+    documents: sanitizedDocuments
+  };
+
   res.json({
-    caseItem,
-    canViewRestrictedFiles: user.role === 'lawyer' && user.isVerifiedLawyer === true
+    caseItem: sanitizedCase,
+    canViewRestrictedFiles
   });
 });
 
 // -------------------------------------------------------------
-// STRICT DATA SECURITY RULE 1: ONLY VERIFIED LAWYERS CAN VIEW CASE FILES
+// STRICT DATA SECURITY RULE 1: ONLY VERIFIED & ASSIGNED LAWYERS CAN VIEW CASE FILES
 // -------------------------------------------------------------
-// "Only verified lawyers can view case files."
 app.get('/api/cases/:id/files', (req, res) => {
   const { id } = req.params;
   const user = getCurrentUser(req);
@@ -840,8 +974,6 @@ app.get('/api/cases/:id/files', (req, res) => {
   }
 
   // Security check 2: Strict Verified Lawyer Gate for Sensitive Case Vault
-  // If user is a client, they only see public filing certificates, NOT confidential advocate discovery notes
-  // If user is an UNVERIFIED lawyer, access is STRICTLY BLOCKED.
   if (user.role === 'lawyer' && !user.isVerifiedLawyer) {
     return res.status(403).json({
       error: 'Access Denied: Bar Council Verification Required.',
@@ -851,8 +983,17 @@ app.get('/api/cases/:id/files', (req, res) => {
     });
   }
 
-  // If verified lawyer: Full access granted
-  if (user.role === 'lawyer' && user.isVerifiedLawyer) {
+  // Security check 3: Lawyer must be assigned to the matter
+  if (user.role === 'lawyer' && caseItem.assignedLawyerId !== user.id) {
+    return res.status(403).json({
+      error: 'Access Denied: Advocate Case Assignment Required.',
+      message: 'Confidential discovery files are accessible only to the assigned counsel of record.',
+      securityCode: 'SEC_UNASSIGNED_ADVOCATE_BLOCKED'
+    });
+  }
+
+  // If verified assigned lawyer: Full access granted
+  if (user.role === 'lawyer' && user.isVerifiedLawyer && caseItem.assignedLawyerId === user.id) {
     return res.json({
       authorized: true,
       accessTier: 'VERIFIED_ADVOCATE_FULL_VAULT_ACCESS',
@@ -863,15 +1004,15 @@ app.get('/api/cases/:id/files', (req, res) => {
     });
   }
 
-  // If client viewing their own case: they get non-restricted client view
+  // If client viewing their own case: they get non-restricted client view (never internal confidential advocate files)
   if (user.role === 'client' && caseItem.clientId === user.id) {
+    const clientSafeDocuments = caseItem.documents.filter(d => !d.isRestricted || d.uploadedBy.includes(user.name));
     return res.json({
       authorized: true,
       accessTier: 'CLIENT_OWN_DOCUMENTS_VIEW',
       caseNumber: caseItem.caseNumber,
-      documents: caseItem.documents.map(d => ({
+      documents: clientSafeDocuments.map(d => ({
         ...d,
-        // Mark restricted advocate work product if needed
         isClientAccessible: true
       }))
     });
@@ -880,14 +1021,29 @@ app.get('/api/cases/:id/files', (req, res) => {
   return res.status(403).json({ error: 'Unauthorized file access.' });
 });
 
-// Create / File a new legal case matter
+// Create / File a new legal case matter (Strict Input Validation)
 app.post('/api/cases/file', (req, res) => {
   const user = getCurrentUser(req);
   const { title, caseType, courtName, respondent, summaryBrief, assignedLawyerId } = req.body;
 
-  if (!title || !caseType || !courtName || !respondent) {
-    return res.status(400).json({ error: 'Missing required case filing fields.' });
+  if (!title || typeof title !== 'string' || title.trim().length < 3) {
+    return res.status(400).json({ error: 'Case title is required (minimum 3 characters, max 150).' });
   }
+  if (!caseType || typeof caseType !== 'string' || caseType.trim().length < 2) {
+    return res.status(400).json({ error: 'Case type category is required.' });
+  }
+  if (!courtName || typeof courtName !== 'string' || courtName.trim().length < 3) {
+    return res.status(400).json({ error: 'Valid Court jurisdiction/name is required.' });
+  }
+  if (!respondent || typeof respondent !== 'string' || respondent.trim().length < 2) {
+    return res.status(400).json({ error: 'Respondent identity is required.' });
+  }
+
+  const cleanTitle = title.trim().substring(0, 150);
+  const cleanCaseType = caseType.trim().substring(0, 80);
+  const cleanCourtName = courtName.trim().substring(0, 150);
+  const cleanRespondent = respondent.trim().substring(0, 150);
+  const cleanSummary = summaryBrief ? String(summaryBrief).trim().substring(0, 3000) : 'Formal petition filed under expedited justice protocol.';
 
   const lawyer = lawyersDirectory.find(l => l.id === assignedLawyerId) || (lawyersDirectory.length > 0 ? lawyersDirectory[0] : null);
   const newCaseId = `case_${Date.now()}`;
@@ -896,17 +1052,17 @@ app.post('/api/cases/file', (req, res) => {
 
   const newCase: CaseMatter = {
     id: newCaseId,
-    caseNumber: `MISC/${courtName.includes('Delhi') ? 'DL' : 'KA'}/2026/${randomCaseNum}`,
+    caseNumber: `MISC/${cleanCourtName.includes('Delhi') ? 'DL' : 'KA'}/2026/${randomCaseNum}`,
     cnrNumber: `JB01-${randomCnrSuffix}-2026`,
-    title,
-    caseType,
+    title: cleanTitle,
+    caseType: cleanCaseType as any,
     filingDate: new Date().toISOString().split('T')[0],
-    courtName,
+    courtName: cleanCourtName,
     jurisdiction: 'High Court Jurisdiction',
     bench: 'Single Judge Roster Bench',
     judgeName: 'Hon\'ble Presiding Judge',
     petitioner: `${user.name} (Client / Petitioner)`,
-    respondent,
+    respondent: cleanRespondent,
     clientId: user.id, // Bound strictly to user
     clientName: user.name,
     clientEmail: user.email,
@@ -918,7 +1074,7 @@ app.post('/api/cases/file', (req, res) => {
     estimatedDisposalDays: 120,
     delayRiskScore: 'Low',
     delayDays: 0,
-    summaryBrief: summaryBrief || 'Formal petition filed under expedited justice protocol.',
+    summaryBrief: cleanSummary,
     nextHearingDate: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().split('T')[0],
     hearings: [
       {
@@ -1127,22 +1283,73 @@ app.post('/api/membership/checkout', async (req, res) => {
   });
 });
 
-// Verify & Activate Membership Payment (Enforces strict signature & anti-replay verification)
+// Verify & Activate Membership Payment (Enforces strict signature, order ownership & anti-replay verification)
 app.post('/api/membership/verify-payment', (req, res) => {
   const user = getCurrentUser(req);
-  const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+  const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
 
-  // 1. Mandatory Replay Attack Protection
+  // 1. REJECT ZERO OR NEGATIVE PAYMENT ATTEMPTS
+  if (amount !== undefined && Number(amount) <= 0) {
+    return res.status(400).json({
+      error: 'Invalid payment: Zero-amount or negative transactions are rejected.',
+      securityCode: 'SEC_ZERO_PAYMENT_PROHIBITED'
+    });
+  }
+
+  // 2. MANDATORY PRE-RECORDED SERVER ORDER LOOKUP
+  const lookupOrderId = razorpay_order_id || orderId;
+  if (!lookupOrderId || !createdOrdersMap.has(lookupOrderId)) {
+    return res.status(400).json({
+      error: 'Unregistered order: Payment verification requires a pre-recorded server order.',
+      securityCode: 'SEC_UNREGISTERED_ORDER_REJECTED'
+    });
+  }
+
+  const recordedOrder = createdOrdersMap.get(lookupOrderId)!;
+
+  // 3. ENFORCE ORDER OWNERSHIP (Must belong to authenticated user)
+  if (recordedOrder.userId !== user.id) {
+    return res.status(403).json({
+      error: 'Access Denied: Payment order ownership mismatch.',
+      securityCode: 'SEC_ORDER_OWNERSHIP_MISMATCH'
+    });
+  }
+
+  // 4. PREVENT REPLAY / RE-USE OF ALREADY VERIFIED ORDERS
+  if (recordedOrder.status === 'verified') {
+    return res.status(409).json({
+      error: 'Order has already been verified and fulfilled.',
+      securityCode: 'SEC_ORDER_ALREADY_VERIFIED'
+    });
+  }
+
+  // 5. ENFORCE EXPECTED NON-ZERO PLAN FEE
+  const isLawyer = user.role === 'lawyer';
+  const expectedFee = isLawyer ? 5999 : 2999;
+  if (recordedOrder.amount !== expectedFee || recordedOrder.amount <= 0) {
+    return res.status(400).json({
+      error: 'Tampered order amount detected. Verified payment must match registered plan fee.',
+      securityCode: 'SEC_ORDER_AMOUNT_TAMPERING_DETECTED'
+    });
+  }
+
+  // 6. MANDATORY REPLAY ATTACK & TRANSACTION ID VALIDATION
   const activeTxnId = razorpay_payment_id || transactionId;
-  if (activeTxnId && processedPaymentIds.has(activeTxnId)) {
+  if (!activeTxnId) {
+    return res.status(400).json({
+      error: 'Missing required transaction identifier for payment audit.',
+      securityCode: 'SEC_MISSING_TRANSACTION_ID'
+    });
+  }
+
+  if (processedPaymentIds.has(activeTxnId)) {
     return res.status(409).json({
       error: 'Duplicate payment transaction detected. Replay attack blocked.',
       securityCode: 'SEC_PAYMENT_REPLAY_ATTACK_PREVENTED'
     });
   }
 
-  // 2. Cryptographic Signature Verification
-  // If Razorpay gateway flow is active, signature validation is mandatory
+  // 7. CRYPTOGRAPHIC SIGNATURE VERIFICATION
   if (razorpay_payment_id || razorpay_order_id || razorpay_signature) {
     if (!razorpay_signature || !razorpay_payment_id || !razorpay_order_id) {
       return res.status(400).json({
@@ -1166,18 +1373,10 @@ app.post('/api/membership/verify-payment', (req, res) => {
     }
   }
 
-  // Mark transaction as consumed to prevent replay
-  if (activeTxnId) {
-    processedPaymentIds.add(activeTxnId);
-  }
+  // Mark transaction as consumed and order as verified
+  processedPaymentIds.add(activeTxnId);
+  recordedOrder.status = 'verified';
 
-  const lookupOrderId = razorpay_order_id || orderId;
-  if (lookupOrderId && createdOrdersMap.has(lookupOrderId)) {
-    const recordedOrder = createdOrdersMap.get(lookupOrderId)!;
-    recordedOrder.status = 'verified';
-  }
-
-  const isLawyer = user.role === 'lawyer';
   const totalAmount = isLawyer ? 5999 : 2999;
   const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
   const taxAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
@@ -1588,7 +1787,35 @@ Output only valid JSON.`;
       if (response.text) {
         try {
           const parsed = JSON.parse(response.text);
-          extractedData = { ...extractedData, ...parsed };
+          if (parsed && typeof parsed === 'object') {
+            if (typeof parsed.title === 'string' && parsed.title.trim().length > 0) {
+              extractedData.title = parsed.title.trim().slice(0, 150);
+            }
+            if (typeof parsed.caseType === 'string' && parsed.caseType.trim().length > 0) {
+              extractedData.caseType = parsed.caseType.trim().slice(0, 80);
+            }
+            if (typeof parsed.courtName === 'string' && parsed.courtName.trim().length > 0) {
+              extractedData.courtName = parsed.courtName.trim().slice(0, 150);
+            }
+            if (typeof parsed.respondent === 'string' && parsed.respondent.trim().length > 0) {
+              extractedData.respondent = parsed.respondent.trim().slice(0, 150);
+            }
+            if (typeof parsed.summaryBrief === 'string' && parsed.summaryBrief.trim().length > 0) {
+              extractedData.summaryBrief = parsed.summaryBrief.trim().slice(0, 3000);
+            }
+            if (Array.isArray(parsed.legalSections)) {
+              extractedData.legalSections = parsed.legalSections.map((s: any) => String(s).trim().slice(0, 100)).slice(0, 8);
+            }
+            if (typeof parsed.reliefSought === 'string') {
+              extractedData.reliefSought = parsed.reliefSought.trim().slice(0, 500);
+            }
+            if (Array.isArray(parsed.keyFacts)) {
+              extractedData.keyFacts = parsed.keyFacts.map((f: any) => String(f).trim().slice(0, 150)).slice(0, 8);
+            }
+            if (typeof parsed.spokenSummaryInNativeLang === 'string' && parsed.spokenSummaryInNativeLang.trim().length > 0) {
+              extractedData.spokenSummaryInNativeLang = parsed.spokenSummaryInNativeLang.trim().slice(0, 500);
+            }
+          }
         } catch (parseErr) {
           console.warn('JSON parsing fallback for voice case:', parseErr);
         }

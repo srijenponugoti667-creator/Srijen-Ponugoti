@@ -18,7 +18,7 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
 });
 
-app.use('/api/', apiLimiter);
+app.use(apiLimiter);
 
 // Detect production environment:
 // 1. Explicit NODE_ENV === 'production'
@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 });
 
 // Health check endpoints for Google Cloud Run container readiness & liveness probes
-app.get(['/health', '/api/health'], (req, res) => {
+app.get(['/health', '/api/health'], apiLimiter, (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
@@ -50,8 +50,8 @@ app.get(['/health', '/api/health'], (req, res) => {
 const publicPath = path.resolve(process.cwd(), 'public');
 app.use(express.static(publicPath));
 
-// Service Worker with no-cache headers to ensure immediate client updates
-app.get('/sw.js', (req, res) => {
+// Service Worker with rate-limiting & no-cache headers to ensure immediate client updates (Addresses CodeQL line 54)
+app.get('/sw.js', apiLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -59,15 +59,15 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.resolve(publicPath, 'sw.js'));
 });
 
-// Explicit Manifest Routes with exact MIME types
-app.get(['/manifest.json', '/manifest.webmanifest', '/site.webmanifest'], (req, res) => {
+// Explicit Manifest Routes with exact MIME types and rate limiter
+app.get(['/manifest.json', '/manifest.webmanifest', '/site.webmanifest'], apiLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.sendFile(path.resolve(publicPath, 'manifest.json'));
 });
 
 // Digital Asset Links for Android TWA
-app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], (req, res) => {
+app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], apiLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.sendFile(path.resolve(publicPath, '.well-known/assetlinks.json'));
@@ -141,52 +141,17 @@ async function generateGeminiWithFallback(
   throw lastError || new Error('All Gemini model candidates exhausted');
 }
 
-// Helper to ensure 21-Day Free Trial & Auto-Payment Mandate (Option A)
-function ensureUserTrial(user: User): User {
-  const isLawyer = user.role === 'lawyer';
-  const planFee = isLawyer ? 5999 : 2999;
-  
-  if (!user.trialStartDate) {
-    const now = new Date();
-    const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
-    user.trialStartDate = now.toISOString();
-    user.trialEndsAt = trialEnd.toISOString();
-    user.isTrialActive = true;
-    user.autoPaymentMandateActive = user.autoPaymentMandateActive ?? true; // Option A: Auto-payment mandate registered during onboarding
-    user.mandateMethod = user.mandateMethod ?? 'upi_autopay';
-    user.mandateDetails = user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
-    user.nextBillingDate = trialEnd.toISOString(); // Day 22 auto-debit
-    user.mandateStatus = 'active';
-    user.autoDebitAmount = planFee;
-    user.membershipActive = true; // Trial grants full access!
-    user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
-    user.membershipExpiresAt = trialEnd.toISOString();
-  }
-
-  // Calculate dynamic days remaining with consistent expiry enforcement
-  if (user.trialEndsAt) {
-    const msRemaining = new Date(user.trialEndsAt).getTime() - Date.now();
-    const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
-    user.trialDaysRemaining = daysRemaining;
-    user.isTrialActive = daysRemaining > 0 && !user.trialCancelled;
-    user.autoDebitAmount = isLawyer ? 5999 : 2999;
-
-    // Enforce consistent expiry: If trial has ended and user has not paid for annual membership, revoke active status
-    if (daysRemaining <= 0) {
-      if (user.membershipExpiresAt && new Date(user.membershipExpiresAt).getTime() <= Date.now()) {
-        user.membershipActive = false;
-      }
-    }
-  }
-
-  return user;
+// Safe Key Validator to prevent prototype pollution
+function isSafeIdentifier(id: unknown): boolean {
+  if (typeof id !== 'string' || !id) return false;
+  return id !== '__proto__' && id !== 'constructor' && id !== 'prototype';
 }
 
 // Default Guest User with 21-Day Free Trial and Auto-Payment Mandate
 const nowTime = new Date();
 const defaultTrialEndTime = new Date(nowTime.getTime() + 21 * 24 * 60 * 60 * 1000);
 
-const defaultGuestUser: User = {
+const defaultGuestUser: Readonly<User> = Object.freeze({
   id: 'guest_user',
   name: 'Litigant / Guest',
   email: 'guest@justicebridge.in',
@@ -204,12 +169,89 @@ const defaultGuestUser: User = {
   nextBillingDate: defaultTrialEndTime.toISOString(),
   mandateStatus: 'active',
   autoDebitAmount: 2999
-};
+});
 
-// In-Memory Database initialized with default guest user
-const users: Record<string, User> = {
-  guest_user: defaultGuestUser
-};
+// Map-based In-Memory Database (Prevents prototype pollution by design, immune to Object.prototype manipulation)
+const usersMap = new Map<string, User>();
+usersMap.set('guest_user', { ...defaultGuestUser });
+
+function getUser(id: unknown): User | undefined {
+  if (!isSafeIdentifier(id)) return undefined;
+  return usersMap.get(id as string);
+}
+
+function setUser(id: unknown, userObj: User): void {
+  if (!isSafeIdentifier(id) || !userObj) return;
+  usersMap.set(id as string, { ...userObj });
+}
+
+function getAllUsers(): User[] {
+  return Array.from(usersMap.values());
+}
+
+// Helper to ensure 21-Day Free Trial & Auto-Payment Mandate (Option A) - Immutable copy pattern
+function ensureUserTrial(user: User): User {
+  if (!user || typeof user !== 'object') return { ...defaultGuestUser };
+  const isLawyer = user.role === 'lawyer';
+  const planFee = isLawyer ? 5999 : 2999;
+  
+  let trialStartDate = user.trialStartDate;
+  let trialEndsAt = user.trialEndsAt;
+  let autoPaymentMandateActive = user.autoPaymentMandateActive ?? true;
+  let mandateMethod = user.mandateMethod ?? 'upi_autopay';
+  let mandateDetails = user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
+  let nextBillingDate = user.nextBillingDate;
+  let mandateStatus = user.mandateStatus ?? 'active';
+  let autoDebitAmount = user.autoDebitAmount ?? planFee;
+  let membershipActive = user.membershipActive ?? true;
+  let membershipPlan = user.membershipPlan ?? (isLawyer ? 'advocate_annual' : 'client_annual');
+  let membershipExpiresAt = user.membershipExpiresAt;
+
+  if (!trialStartDate) {
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+    trialStartDate = now.toISOString();
+    trialEndsAt = trialEnd.toISOString();
+    nextBillingDate = trialEnd.toISOString();
+    membershipExpiresAt = trialEnd.toISOString();
+  }
+
+  let trialDaysRemaining = user.trialDaysRemaining ?? 21;
+  let isTrialActive = user.isTrialActive ?? true;
+
+  if (trialEndsAt) {
+    const msRemaining = new Date(trialEndsAt).getTime() - Date.now();
+    trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    isTrialActive = trialDaysRemaining > 0 && !user.trialCancelled;
+
+    if (trialDaysRemaining <= 0 && membershipExpiresAt && new Date(membershipExpiresAt).getTime() <= Date.now()) {
+      membershipActive = false;
+    }
+  }
+
+  const safeUser: User = {
+    ...user,
+    trialStartDate,
+    trialEndsAt,
+    isTrialActive,
+    trialDaysRemaining,
+    autoPaymentMandateActive,
+    mandateMethod,
+    mandateDetails,
+    nextBillingDate,
+    mandateStatus,
+    autoDebitAmount,
+    membershipActive,
+    membershipPlan,
+    membershipExpiresAt
+  };
+
+  if (user.id && isSafeIdentifier(user.id)) {
+    usersMap.set(user.id, safeUser);
+  }
+
+  return safeUser;
+}
 
 // -------------------------------------------------------------
 // VERIFIED CRYPTOGRAPHIC SESSIONS STORE (Anti-Spoofing Identity Engine)
@@ -247,14 +289,17 @@ function getAuthenticatedUser(req?: express.Request): User {
 
     if (token && sessionStore.has(token)) {
       const session = sessionStore.get(token)!;
-      if (session.expiresAt > Date.now() && users[session.userId]) {
-        return ensureUserTrial(users[session.userId]);
+      if (session.expiresAt > Date.now()) {
+        const matched = getUser(session.userId);
+        if (matched) {
+          return ensureUserTrial(matched);
+        }
       }
     }
   }
 
   // Fallback to default guest user with strictly client-tier isolation
-  return ensureUserTrial(defaultGuestUser);
+  return ensureUserTrial({ ...defaultGuestUser });
 }
 
 function getCurrentUser(req?: express.Request): User {
@@ -293,7 +338,7 @@ const processedPaymentIds = new Set<string>();
 // -------------------------------------------------------------
 
 // 1. Get Current User / Issue Verified Session
-app.get('/api/auth/current-user', (req, res) => {
+app.get('/api/auth/current-user', apiLimiter, (req, res) => {
   const user = getAuthenticatedUser(req);
   // Ensure an authenticated session token exists for this user
   let token: string | undefined;
@@ -311,19 +356,20 @@ app.get('/api/auth/current-user', (req, res) => {
   res.json({
     user: user || null,
     sessionToken: token,
-    availablePersonas: Object.values(users)
+    availablePersonas: getAllUsers()
   });
 });
 
 app.post('/api/auth/switch-persona', apiLimiter, (req, res) => {
   const { userId } = req.body;
-  if (!users[userId]) {
+  const targetUser = getUser(userId);
+  if (!targetUser) {
     return res.status(404).json({ error: 'User profile not found in registry.' });
   }
   const sessionToken = createSessionToken(userId);
   res.json({
     message: 'Verified session established successfully',
-    user: users[userId],
+    user: targetUser,
     sessionToken
   });
 });
@@ -391,7 +437,7 @@ app.post('/api/auth/register', apiLimiter, (req, res) => {
     autoDebitAmount: isLawyer ? 5999 : 2999
   };
 
-  users[newId] = newUser;
+  setUser(newId, newUser);
   const sessionToken = createSessionToken(newId);
 
   if (isLawyer) {
@@ -436,7 +482,7 @@ app.post('/api/auth/register', apiLimiter, (req, res) => {
   });
 });
 
-// Profile Update
+// Profile Update (Uses strict input sanitization and safe immutable object replacement)
 app.put('/api/users/profile', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
   if (!user) {
@@ -444,37 +490,58 @@ app.put('/api/users/profile', apiLimiter, (req, res) => {
   }
 
   const { name, phone, practiceLocation, yearsExperience, specialization, consultationFee, bio, barCouncilNumber, stateBarCouncil } = req.body;
-  if (name) user.name = name;
-  if (phone) user.phone = phone;
-  if (practiceLocation) user.practiceLocation = practiceLocation;
-  if (yearsExperience) user.yearsExperience = Number(yearsExperience);
-  if (specialization) user.specialization = specialization;
-  if (consultationFee) user.consultationFee = Number(consultationFee);
-  if (bio) user.bio = bio;
-  if (barCouncilNumber) user.barCouncilNumber = barCouncilNumber;
-  if (stateBarCouncil) user.stateBarCouncil = stateBarCouncil;
+  
+  const safeName = typeof name === 'string' ? sanitizePromptInput(name, 100) : user.name;
+  const safePhone = typeof phone === 'string' ? sanitizePromptInput(phone, 20) : user.phone;
+  const safePracticeLocation = typeof practiceLocation === 'string' ? sanitizePromptInput(practiceLocation, 100) : user.practiceLocation;
+  const safeYearsExp = yearsExperience !== undefined ? Math.max(0, Math.min(60, Number(yearsExperience) || 0)) : user.yearsExperience;
+  const safeSpec = typeof specialization === 'string' ? [sanitizePromptInput(specialization, 100)] : Array.isArray(specialization) ? specialization.map(s => String(s).slice(0, 50)) : user.specialization;
+  const safeFee = consultationFee !== undefined ? Math.max(0, Math.min(50000, Number(consultationFee) || 0)) : user.consultationFee;
+  const safeBio = typeof bio === 'string' ? sanitizePromptInput(bio, 500) : user.bio;
+  const safeBarNum = typeof barCouncilNumber === 'string' ? sanitizePromptInput(barCouncilNumber, 50) : user.barCouncilNumber;
+  const safeStateBar = typeof stateBarCouncil === 'string' ? sanitizePromptInput(stateBarCouncil, 50) : user.stateBarCouncil;
+
+  const updatedUser: User = {
+    ...user,
+    name: safeName || user.name,
+    phone: safePhone || user.phone,
+    practiceLocation: safePracticeLocation || user.practiceLocation,
+    yearsExperience: safeYearsExp,
+    specialization: safeSpec || user.specialization,
+    consultationFee: safeFee,
+    bio: safeBio || user.bio,
+    barCouncilNumber: safeBarNum || user.barCouncilNumber,
+    stateBarCouncil: safeStateBar || user.stateBarCouncil
+  };
+
+  setUser(user.id, updatedUser);
 
   // Also update directory profile if lawyer
-  const dirLawyer = lawyersDirectory.find(l => l.id === user.id);
-  if (dirLawyer) {
-    if (name) dirLawyer.name = name;
-    if (phone) dirLawyer.phone = phone;
-    if (practiceLocation) dirLawyer.location = practiceLocation;
-    if (yearsExperience) dirLawyer.experienceYears = Number(yearsExperience);
-    if (specialization) dirLawyer.specialization = specialization;
-    if (consultationFee) dirLawyer.consultationFee = Number(consultationFee);
-    if (bio) dirLawyer.bio = bio;
-  }
+  lawyersDirectory = lawyersDirectory.map(l => {
+    if (l.id === user.id) {
+      return {
+        ...l,
+        name: safeName || l.name,
+        phone: safePhone || l.phone,
+        location: safePracticeLocation || l.location,
+        experienceYears: safeYearsExp || l.experienceYears,
+        specialization: safeSpec || l.specialization,
+        consultationFee: safeFee || l.consultationFee,
+        bio: safeBio || l.bio
+      };
+    }
+    return l;
+  });
 
-  res.json({ message: 'Profile updated successfully', user });
+  res.json({ message: 'Profile updated successfully', user: updatedUser });
 });
 
 // 2. Bar Council Lawyer Verification Endpoint (Simulated e-KYC with Input Validation)
 app.post('/api/lawyers/verify', apiLimiter, (req, res) => {
-  const { lawyerId, barCouncilNumber, stateBarCouncil, documentProofUrl } = req.body;
+  const { lawyerId, barCouncilNumber, stateBarCouncil } = req.body;
   const targetUser = getCurrentUser(req);
   const targetId = (lawyerId && targetUser.role === 'admin') ? lawyerId : targetUser.id;
-  const user = users[targetId];
+  const user = getUser(targetId);
 
   if (!user || user.role !== 'lawyer') {
     return res.status(400).json({ error: 'User is not an advocate' });
@@ -491,28 +558,37 @@ app.post('/api/lawyers/verify', apiLimiter, (req, res) => {
     });
   }
 
-  // Update user verification status
-  user.isVerifiedLawyer = true;
-  user.barCouncilNumber = regNumber;
-  if (barState) user.stateBarCouncil = barState;
+  const updatedAdvocate: User = {
+    ...user,
+    isVerifiedLawyer: true,
+    barCouncilNumber: regNumber,
+    stateBarCouncil: barState || user.stateBarCouncil
+  };
+
+  setUser(targetId, updatedAdvocate);
 
   // Also update directory
-  const dirLawyer = lawyersDirectory.find(l => l.id === targetId);
-  if (dirLawyer) {
-    dirLawyer.isVerified = true;
-    dirLawyer.barCouncilNumber = regNumber;
-    if (barState) dirLawyer.stateBarCouncil = barState;
-  }
+  lawyersDirectory = lawyersDirectory.map(l => {
+    if (l.id === targetId) {
+      return {
+        ...l,
+        isVerified: true,
+        barCouncilNumber: regNumber,
+        stateBarCouncil: barState || l.stateBarCouncil
+      };
+    }
+    return l;
+  });
 
   res.json({
     success: true,
     message: 'Bar Council credentials successfully verified via Bar Council of India e-Portal.',
-    user
+    user: updatedAdvocate
   });
 });
 
 // 3. Lawyers Directory & Search with Advanced Filtering and Grading Index
-app.get('/api/lawyers', (req, res) => {
+app.get('/api/lawyers', apiLimiter, (req, res) => {
   const { query, specialization, verifiedOnly, court, maxFee, minExp, minRating, grade, sortBy } = req.query;
   let results = [...lawyersDirectory];
 
@@ -582,7 +658,7 @@ app.get('/api/lawyers', (req, res) => {
 });
 
 // Single Lawyer Detail & Performance Dossier
-app.get('/api/lawyers/:id', (req, res) => {
+app.get('/api/lawyers/:id', apiLimiter, (req, res) => {
   const { id } = req.params;
   const lawyer = lawyersDirectory.find(l => l.id === id);
   if (!lawyer) {
@@ -671,7 +747,7 @@ app.post('/api/lawyers/:id/reviews', apiLimiter, (req, res) => {
 });
 
 // Consultations Bookings API
-app.get('/api/consultations', (req, res) => {
+app.get('/api/consultations', apiLimiter, (req, res) => {
   const user = getCurrentUser();
   let list = [...consultationBookings];
 
@@ -747,14 +823,14 @@ app.patch('/api/consultations/:id/status', apiLimiter, (req, res) => {
 });
 
 // All Invoices for current user
-app.get('/api/invoices', (req, res) => {
+app.get('/api/invoices', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
   const userInvoices = invoices.filter(i => i.userId === user.id);
   res.json({ invoices: userInvoices });
 });
 
 // 4. Case Lookup & Public Search ("Find a Case") with Advanced Filtering
-app.get('/api/cases/search', (req, res) => {
+app.get('/api/cases/search', apiLimiter, (req, res) => {
   const { query, caseType, status, court, delayRiskScore, sortBy } = req.query;
   let results = casesStore.map(c => {
     // Return sanitized public record (no confidential internal evidence documents exposed in public search)
@@ -831,7 +907,7 @@ app.get('/api/cases/search', (req, res) => {
 // STRICT DATA SECURITY RULE 2: CLIENT ISOLATION
 // -------------------------------------------------------------
 // "Clients are completely isolated so no client can see another client's cases."
-app.get('/api/cases', (req, res) => {
+app.get('/api/cases', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
 
   if (user.role === 'client') {
@@ -893,7 +969,7 @@ app.get('/api/cases', (req, res) => {
 });
 
 // Single Case Detail with Strict Security Checks & Document Sanitization
-app.get('/api/cases/:id', (req, res) => {
+app.get('/api/cases/:id', apiLimiter, (req, res) => {
   const { id } = req.params;
   const user = getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
@@ -966,7 +1042,7 @@ app.get('/api/cases/:id', (req, res) => {
 // -------------------------------------------------------------
 // STRICT DATA SECURITY RULE 1: ONLY VERIFIED & ASSIGNED LAWYERS CAN VIEW CASE FILES
 // -------------------------------------------------------------
-app.get('/api/cases/:id/files', (req, res) => {
+app.get('/api/cases/:id/files', apiLimiter, (req, res) => {
   const { id } = req.params;
   const user = getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
@@ -1168,7 +1244,7 @@ app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
 // - Clients must see a notification to pay a membership fee of 2,999 Rupees per year.
 // - Advocates/Lawyers must see a notification to pay a membership fee of 5,999 Rupees per year.
 
-app.get('/api/membership/status', (req, res) => {
+app.get('/api/membership/status', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
 
   const clientFee = 2999;
@@ -1395,10 +1471,14 @@ app.post('/api/membership/verify-payment', apiLimiter, (req, res) => {
   const expiresAtDate = new Date(now);
   expiresAtDate.setFullYear(expiresAtDate.getFullYear() + 1);
 
-  // Activate membership on user
-  user.membershipActive = true;
-  user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
-  user.membershipExpiresAt = expiresAtDate.toISOString();
+  // Activate membership on user (Immutable safe update)
+  const updatedUser: User = {
+    ...user,
+    membershipActive: true,
+    membershipPlan: isLawyer ? 'advocate_annual' : 'client_annual',
+    membershipExpiresAt: expiresAtDate.toISOString()
+  };
+  setUser(user.id, updatedUser);
 
   const txnId = razorpay_payment_id || transactionId || `TXN_${paymentMethod || 'UPI'}_${Date.now()}`;
   const invNumber = `JB-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1429,7 +1509,7 @@ app.post('/api/membership/verify-payment', apiLimiter, (req, res) => {
     message: isLawyer
       ? 'Advocate Practice Subscription (₹5,999/year) activated successfully!'
       : 'Annual Client Justice Pass (₹2,999/year) activated successfully!',
-    user,
+    user: updatedUser,
     invoice: newInvoice
   });
 });
@@ -1441,39 +1521,53 @@ app.post('/api/membership/setup-mandate', apiLimiter, (req, res) => {
   const isLawyer = user.role === 'lawyer';
   const planFee = isLawyer ? 5999 : 2999;
 
-  user.autoPaymentMandateActive = true;
-  user.mandateStatus = 'active';
-  user.mandateMethod = mandateMethod || 'upi_autopay';
-  user.mandateDetails = mandateDetails || (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
-  user.autoDebitAmount = planFee;
-  user.trialCancelled = false;
+  const allowedMandateMethods: Array<'upi_autopay' | 'card_mandate' | 'netbanking_emandate' | 'none'> = ['upi_autopay', 'card_mandate', 'netbanking_emandate', 'none'];
+  const safeMethod: 'upi_autopay' | 'card_mandate' | 'netbanking_emandate' | 'none' = (typeof mandateMethod === 'string' && allowedMandateMethods.includes(mandateMethod as any))
+    ? (mandateMethod as any)
+    : 'upi_autopay';
+  const safeDetails = typeof mandateDetails === 'string' ? sanitizePromptInput(mandateDetails, 100) : (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
 
-  // Ensure trial dates are set
-  if (!user.trialEndsAt) {
-    const trialEnd = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
-    user.trialStartDate = new Date().toISOString();
-    user.trialEndsAt = trialEnd.toISOString();
-    user.nextBillingDate = trialEnd.toISOString();
-  }
+  const trialEnd = user.trialEndsAt ? user.trialEndsAt : new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+  const trialStart = user.trialStartDate ? user.trialStartDate : new Date().toISOString();
+
+  const updatedUser: User = {
+    ...user,
+    autoPaymentMandateActive: true,
+    mandateStatus: 'active',
+    mandateMethod: safeMethod,
+    mandateDetails: safeDetails,
+    autoDebitAmount: planFee,
+    trialCancelled: false,
+    trialStartDate: trialStart,
+    trialEndsAt: trialEnd,
+    nextBillingDate: trialEnd
+  };
+
+  setUser(user.id, updatedUser);
 
   res.json({
     success: true,
-    message: `Auto-Payment Mandate successfully registered (${user.mandateDetails}). ₹0 charged today. Next billing of ₹${planFee.toLocaleString('en-IN')} scheduled on Day 22.`,
-    user
+    message: `Auto-Payment Mandate successfully registered (${updatedUser.mandateDetails}). ₹0 charged today. Next billing of ₹${planFee.toLocaleString('en-IN')} scheduled on Day 22.`,
+    user: updatedUser
   });
 });
 
 // Cancel Auto-Payment Mandate (1-click cancel before Day 22)
 app.post('/api/membership/cancel-mandate', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
-  user.autoPaymentMandateActive = false;
-  user.mandateStatus = 'cancelled';
-  user.trialCancelled = true;
+  const updatedUser: User = {
+    ...user,
+    autoPaymentMandateActive: false,
+    mandateStatus: 'cancelled',
+    trialCancelled: true
+  };
+
+  setUser(user.id, updatedUser);
 
   res.json({
     success: true,
     message: 'Auto-Payment Mandate has been cancelled. No amount will be charged on Day 22.',
-    user
+    user: updatedUser
   });
 });
 
@@ -1498,11 +1592,16 @@ app.post('/api/membership/trigger-day22-autopay', apiLimiter, (req, res) => {
   expiresAtDate.setFullYear(expiresAtDate.getFullYear() + 1);
 
   // Mark trial as finished and annual subscription active
-  user.membershipActive = true;
-  user.isTrialActive = false;
-  user.trialDaysRemaining = 0;
-  user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
-  user.membershipExpiresAt = expiresAtDate.toISOString();
+  const updatedUser: User = {
+    ...user,
+    membershipActive: true,
+    isTrialActive: false,
+    trialDaysRemaining: 0,
+    membershipPlan: isLawyer ? 'advocate_annual' : 'client_annual',
+    membershipExpiresAt: expiresAtDate.toISOString()
+  };
+
+  setUser(user.id, updatedUser);
 
   const txnId = `AUTOPAY_D22_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
   const invNumber = `JB-AUTO-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1533,7 +1632,7 @@ app.post('/api/membership/trigger-day22-autopay', apiLimiter, (req, res) => {
     message: isLawyer
       ? 'Day 22 mandate successfully processed! Advocate Practice Subscription (₹5,999/year) renewed.'
       : 'Day 22 mandate successfully processed! Annual Client Justice Pass (₹2,999/year) renewed.',
-    user,
+    user: updatedUser,
     invoice: newInvoice
   });
 });
@@ -1935,9 +2034,10 @@ Output only valid JSON.`;
 });
 
 // Platform Statistics (Dynamic calculation from live platform state)
-app.get('/api/analytics', (req, res) => {
-  const verifiedAdvocates = Object.values(users).filter(u => u?.role === 'lawyer' && u?.isVerifiedLawyer).length;
-  const totalRegisteredAdvocates = Object.values(users).filter(u => u?.role === 'lawyer').length;
+app.get('/api/analytics', apiLimiter, (req, res) => {
+  const userList = Array.from(usersMap.values());
+  const verifiedAdvocates = userList.filter(u => u?.role === 'lawyer' && u?.isVerifiedLawyer).length;
+  const totalRegisteredAdvocates = userList.filter(u => u?.role === 'lawyer').length;
   const totalCases = casesStore.length;
   const activeHearings = casesStore.reduce((acc, c) => acc + (c.hearings ? c.hearings.length : 0), 0);
 

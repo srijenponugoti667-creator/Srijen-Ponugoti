@@ -526,7 +526,7 @@ app.put('/api/users/profile', apiLimiter, (req, res) => {
   // codeql[js/prototype-polluting-assignment]
   if (yearsExperience) user.yearsExperience = Number(yearsExperience);
   // codeql[js/prototype-polluting-assignment]
-  if (specialization) user.specialization = String(specialization);
+  if (specialization) user.specialization = (Array.isArray(specialization) ? specialization : [String(specialization)]) as any;
   // codeql[js/prototype-polluting-assignment]
   if (consultationFee) user.consultationFee = Number(consultationFee);
   // codeql[js/prototype-polluting-assignment]
@@ -1535,7 +1535,7 @@ app.post('/api/membership/setup-mandate', apiLimiter, (req, res) => {
   // codeql[js/prototype-polluting-assignment]
   user.mandateStatus = 'active';
   // codeql[js/prototype-polluting-assignment]
-  user.mandateMethod = String(mandateMethod || 'upi_autopay');
+  user.mandateMethod = (mandateMethod || 'upi_autopay') as User['mandateMethod'];
   // codeql[js/prototype-polluting-assignment]
   user.mandateDetails = String(mandateDetails || (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)'));
   // codeql[js/prototype-polluting-assignment]

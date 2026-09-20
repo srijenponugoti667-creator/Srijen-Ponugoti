@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#18181b" />
+      <stop offset="100%" stop-color="#09090b" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#bgGrad)" />
+  <circle cx="256" cy="256" r="230" fill="none" stroke="#7f1d1d" stroke-width="8" stroke-dasharray="16 8" opacity="0.6"/>
+  <!-- Central Beam & Pillar -->
+  <path d="M256 90 L256 380" stroke="url(#goldGrad)" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="256" cy="90" r="18" fill="url(#goldGrad)"/>
+  <!-- Crossbar -->
+  <path d="M120 160 Q256 140 392 160" stroke="url(#goldGrad)" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <!-- Left Scale strings & pan -->
+  <path d="M120 160 L80 270 M120 160 L160 270" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <path d="M60 270 Q120 310 180 270 Z" fill="url(#goldGrad)"/>
+  <!-- Right Scale strings & pan -->
+  <path d="M392 160 L352 270 M392 160 L432 270" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <path d="M332 270 Q392 310 452 270 Z" fill="url(#goldGrad)"/>
+  <!-- Base Pedestal / Bridge -->
+  <path d="M160 380 Q256 360 352 380 L380 430 Q256 420 132 430 Z" fill="url(#goldGrad)"/>
+  <path d="M180 430 Q256 410 332 430" stroke="#7f1d1d" stroke-width="6" fill="none"/>
+</svg>

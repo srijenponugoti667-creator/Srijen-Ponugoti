@@ -565,7 +565,10 @@ app.post('/api/lawyers/verify', apiLimiter, (req, res) => {
   const { lawyerId, barCouncilNumber, stateBarCouncil, documentProofUrl } = req.body;
   const targetUser = getCurrentUser(req);
   const targetId = (lawyerId && targetUser.role === 'admin') ? lawyerId : targetUser.id;
-  const user = users[targetId];
+  if (targetId === '__proto__' || targetId === 'constructor' || targetId === 'prototype') {
+    return res.status(400).json({ error: 'Invalid lawyer ID' });
+  }
+  const user = Object.prototype.hasOwnProperty.call(users, targetId) ? users[targetId] : undefined;
 
   if (!user || user.role !== 'lawyer') {
     return res.status(400).json({ error: 'User is not an advocate' });

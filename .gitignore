@@ -8,3 +8,4 @@ coverage/
 !.env.example
 server.js
 server.cjs
+firebase-applet-config.json

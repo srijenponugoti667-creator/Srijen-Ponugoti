@@ -390,6 +390,15 @@ app.get('/api/auth/current-user', apiLimiter, (req, res) => {
 
 app.post('/api/auth/switch-persona', apiLimiter, (req, res) => {
   const { userId } = req.body;
+  if (
+    typeof userId !== 'string' ||
+    userId.length === 0 ||
+    userId === '__proto__' ||
+    userId === 'constructor' ||
+    userId === 'prototype'
+  ) {
+    return res.status(400).json({ error: 'Invalid userId format.' });
+  }
   if (!users[userId]) {
     return res.status(404).json({ error: 'User profile not found in registry.' });
   }

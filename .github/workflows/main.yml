@@ -16,14 +16,35 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Create Firebase Config
-      run: echo "${{ secrets.FIREBASE_CONFIG_JSON }}" > firebase-applet-config.json
-
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
         cache: 'npm'
+
+    - name: Create Firebase Config
+      env:
+        FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG_JSON }}
+      run: |
+        node -e '
+          const fs = require("fs");
+          let cfg = process.env.FIREBASE_CONFIG;
+          if (!cfg || !cfg.trim() || !cfg.trim().startsWith("{")) {
+            cfg = JSON.stringify({
+              projectId: "zealous-pod-b09p9",
+              appId: "1:426745217281:web:7be49039d080abd3d2db00",
+              apiKey: "placeholder",
+              authDomain: "zealous-pod-b09p9.firebaseapp.com",
+              firestoreDatabaseId: "ai-studio-justicebridge-03ec9cd8-429b-4eed-b01c-7a64e5b3dffd",
+              storageBucket: "zealous-pod-b09p9.firebasestorage.app",
+              messagingSenderId: "426745217281",
+              measurementId: "",
+              oAuthClientId: "426745217281-9h9u405822hdseuq8bcdom3go4ku5g08.apps.googleusercontent.com",
+              recaptchaSiteKey: ""
+            }, null, 2);
+          }
+          fs.writeFileSync("firebase-applet-config.json", cfg.trim());
+        '
 
     - name: Install Dependencies
       run: npm install --legacy-peer-deps

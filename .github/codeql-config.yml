@@ -1,0 +1,8 @@
+name: "CodeQL config"
+
+paths-ignore:
+  - 'server.js'
+  - 'server.cjs'
+  - 'dist/**'
+  - 'build/**'
+  - 'public/**'

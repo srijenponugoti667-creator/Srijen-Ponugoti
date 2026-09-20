@@ -9,21 +9,26 @@ import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, Consulta
 
 const app = express();
 
+// Enable trust proxy so express-rate-limit can accurately detect the client's actual IP
+// behind the Google Cloud Run & Nginx reverse proxy load balancers.
+app.set('trust proxy', 1);
+
+// Detect production environment:
+// 1. Explicit NODE_ENV === 'production'
+// 2. Or running the compiled bundle dist/server.cjs
+const isProduction = process.env.NODE_ENV === 'production' || (typeof __filename !== 'undefined' && __filename.includes('dist'));
+
 // Security Rate Limiter (Addresses CodeQL missing rate limiting alert)
+// Relax rate limiting significantly during non-production/development to avoid locking out the developer.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 200 requests per windowMs
+  max: isProduction ? 200 : 10000, // limit each IP to 200 requests in prod, but relaxed to 10,000 for local dev/preview
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
 });
 
 app.use(apiLimiter);
-
-// Detect production environment:
-// 1. Explicit NODE_ENV === 'production'
-// 2. Or running the compiled bundle dist/server.cjs
-const isProduction = process.env.NODE_ENV === 'production' || (typeof __filename !== 'undefined' && __filename.includes('dist'));
 
 // In Google AI Studio container infrastructure, an nginx reverse proxy runs on 8080
 // and routes all incoming traffic exclusively to port 3000.

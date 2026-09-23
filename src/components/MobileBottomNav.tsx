@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Briefcase, FileText, FolderLock, Scale } from 'lucide-react';
+import { Home, Briefcase, FileText, FolderLock, Scale, Search, BarChart3 } from 'lucide-react';
 import { getTranslation } from '../languages';
 
 interface MobileBottomNavProps {
@@ -17,39 +17,73 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
 
-  const navItems = [
-    {
-      id: 'home',
-      label: t('overview'),
-      icon: Home,
-      color: 'text-red-400',
-    },
-    {
-      id: 'lawyers',
-      label: t('findLawyer'),
-      icon: Briefcase,
-      color: 'text-red-400',
-    },
-    {
-      id: 'legal_docs',
-      label: t('legalDocs'),
-      icon: FileText,
-      color: 'text-emerald-400',
-      badge: 'PDF',
-    },
-    {
-      id: 'my_cases',
-      label: isLawyer ? 'Case Vault' : t('myCases'),
-      icon: FolderLock,
-      color: 'text-red-400',
-    },
-    {
-      id: 'ai_assistant',
-      label: t('aiCounsel'),
-      icon: Scale,
-      color: 'text-amber-400',
-    },
-  ];
+  const navItems = isLawyer
+    ? [
+        {
+          id: 'home',
+          label: t('overview'),
+          icon: Home,
+          color: 'text-red-400',
+        },
+        {
+          id: 'find_case',
+          label: t('findCase'),
+          icon: Search,
+          color: 'text-red-400',
+        },
+        {
+          id: 'legal_docs',
+          label: t('legalDocs'),
+          icon: FileText,
+          color: 'text-emerald-400',
+          badge: 'PDF',
+        },
+        {
+          id: 'my_cases',
+          label: 'Case Vault',
+          icon: FolderLock,
+          color: 'text-red-400',
+        },
+        {
+          id: 'analytics',
+          label: t('delayAnalytics'),
+          icon: BarChart3,
+          color: 'text-amber-400',
+        },
+      ]
+    : [
+        {
+          id: 'home',
+          label: t('overview'),
+          icon: Home,
+          color: 'text-red-400',
+        },
+        {
+          id: 'lawyers',
+          label: t('findLawyer'),
+          icon: Briefcase,
+          color: 'text-red-400',
+        },
+        {
+          id: 'legal_docs',
+          label: t('legalDocs'),
+          icon: FileText,
+          color: 'text-emerald-400',
+          badge: 'PDF',
+        },
+        {
+          id: 'my_cases',
+          label: t('myCases'),
+          icon: FolderLock,
+          color: 'text-red-400',
+        },
+        {
+          id: 'ai_assistant',
+          label: t('aiCounsel'),
+          icon: Scale,
+          color: 'text-amber-400',
+        },
+      ];
 
   return (
     <div 

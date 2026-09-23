@@ -120,8 +120,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Primary Action Buttons */}
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3.5 flex-wrap">
             
-            {/* Button: Voice Case Filing */}
-            {onOpenVoiceCaseFilerClick && (
+            {/* Button: Voice Case Filing (Litigants only) */}
+            {onOpenVoiceCaseFilerClick && currentUser?.role !== 'lawyer' && (
               <button
                 id="btn-hero-voice-case-filer"
                 onClick={onOpenVoiceCaseFilerClick}
@@ -132,15 +132,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </button>
             )}
 
-            {/* Button: Find a lawyer */}
-            <button
-              id="btn-hero-find-lawyer"
-              onClick={onFindLawyerClick}
-              className="w-full sm:w-auto flex items-center justify-center space-x-2.5 px-7 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-xs transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-            >
-              <Briefcase className="w-4 h-4 text-slate-300" />
-              <span>{t('btnFindLawyer')}</span>
-            </button>
+            {/* Button: Find a lawyer (Litigants only) */}
+            {currentUser?.role !== 'lawyer' && (
+              <button
+                id="btn-hero-find-lawyer"
+                onClick={onFindLawyerClick}
+                className="w-full sm:w-auto flex items-center justify-center space-x-2.5 px-7 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-xs transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              >
+                <Briefcase className="w-4 h-4 text-slate-300" />
+                <span>{t('btnFindLawyer')}</span>
+              </button>
+            )}
 
             {/* Button: Find a case */}
             <button

@@ -106,7 +106,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
           </div>
 
           <div className="flex items-center space-x-2.5 flex-shrink-0 flex-wrap gap-2">
-            {onOpenVoiceCaseFiler && (
+            {onOpenVoiceCaseFiler && currentUser?.role !== 'lawyer' && (
               <button
                 id="btn-dashboard-voice-file"
                 onClick={onOpenVoiceCaseFiler}

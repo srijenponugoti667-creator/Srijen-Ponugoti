@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Clock, Calendar, AlertTriangle, CheckCircle2, ChevronRight, FileText, Scale, Eye, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Search, Filter, Clock, Calendar, AlertTriangle, CheckCircle2, XCircle, ChevronRight, FileText, Scale, Eye, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { CaseMatter, User } from '../types';
 import { getTranslation } from '../languages';
 
@@ -101,14 +101,16 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
           </p>
         </div>
 
-        <button
-          id="btn-findcase-file-new"
-          onClick={onFileNewCaseClick}
-          className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 hover:to-red-700 text-white font-bold text-xs sm:text-sm shadow-xl border border-red-500/40 transition-all active:scale-95 cursor-pointer"
-        >
-          <FileText className="w-4 h-4 text-red-200" />
-          <span>{t('btnFileNewCasePetition')}</span>
-        </button>
+        {currentUser?.role !== 'lawyer' && (
+          <button
+            id="btn-findcase-file-new"
+            onClick={onFileNewCaseClick}
+            className="flex items-center space-x-2 px-5 py-3 rounded-xl bg-gradient-to-r from-red-700 via-red-800 to-red-900 hover:from-red-600 hover:to-red-700 text-white font-bold text-xs sm:text-sm shadow-xl border border-red-500/40 transition-all active:scale-95 cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-red-200" />
+            <span>{t('btnFileNewCasePetition')}</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar & Filters */}
@@ -212,17 +214,23 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
           <div className="w-16 h-16 rounded-full bg-red-950/40 border border-red-900/50 flex items-center justify-center mx-auto mb-4">
             <Scale className="w-8 h-8 text-red-400" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">{t('noCasesFound')}</h3>
+          <h3 className="text-lg font-bold text-white mb-2">
+            {currentUser?.role === 'lawyer' ? 'No Incoming Client Briefs Awaiting Counsel' : t('noCasesFound')}
+          </h3>
           <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto mb-6">
-            {t('noCasesDesc')}
+            {currentUser?.role === 'lawyer'
+              ? 'When litigants file court petitions or legal matters, they will appear here in your intake feed with options to Accept Brief or Reject.'
+              : t('noCasesDesc')}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={onFileNewCaseClick}
-              className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 text-white text-xs font-bold rounded-xl border border-red-600 shadow-lg cursor-pointer"
-            >
-              {t('btnFileNewCasePetition')}
-            </button>
+            {currentUser?.role !== 'lawyer' && (
+              <button
+                onClick={onFileNewCaseClick}
+                className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 text-white text-xs font-bold rounded-xl border border-red-600 shadow-lg cursor-pointer"
+              >
+                {t('btnFileNewCasePetition')}
+              </button>
+            )}
             {searchQuery && (
               <button
                 onClick={() => {
@@ -271,6 +279,40 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
 
                   {/* Delay Risk Badge */}
                   <div className="flex items-center space-x-3">
+                    {currentUser?.role === 'lawyer' && currentUser?.isVerifiedLawyer && (!c.assignedLawyerId || c.assignedLawyerId === 'unassigned') && (
+                      <div className="flex items-center gap-2 mr-3">
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/cases/${c.id}/intake`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'accept' }),
+                            });
+                            fetchCases();
+                          }}
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all active:scale-95 cursor-pointer"
+                          title="Accept and represent this case"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Accept Brief</span>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/cases/${c.id}/intake`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'reject' }),
+                            });
+                            fetchCases();
+                          }}
+                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-slate-300 hover:text-white border border-zinc-700 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                          title="Decline this case petition"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-red-400" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    )}
                     <div className="text-right">
                       <span className="text-[10px] text-slate-400 uppercase font-semibold block">Delay Telemetry</span>
                       <div className="flex items-center space-x-1.5 justify-end">

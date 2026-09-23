@@ -107,18 +107,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               {t('overview')}
             </button>
 
-            <button
-              id="nav-btn-lawyers"
-              onClick={() => setActiveTab('lawyers')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'lawyers'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-              <span>{t('findLawyer')}</span>
-            </button>
+            {currentUser?.role !== 'lawyer' && (
+              <button
+                id="nav-btn-lawyers"
+                onClick={() => setActiveTab('lawyers')}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'lawyers'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                <span>{t('findLawyer')}</span>
+              </button>
+            )}
 
             <button
               id="nav-btn-grading"
@@ -186,18 +188,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{t('legalDocs')}</span>
             </button>
 
-            <button
-              id="nav-btn-ai-assistant"
-              onClick={() => setActiveTab('ai_assistant')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'ai_assistant'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Scale className="w-3.5 h-3.5 text-amber-600" />
-              <span>{t('aiCounsel')}</span>
-            </button>
+            {currentUser?.role !== 'lawyer' && (
+              <button
+                id="nav-btn-ai-assistant"
+                onClick={() => setActiveTab('ai_assistant')}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'ai_assistant'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Scale className="w-3.5 h-3.5 text-amber-600" />
+                <span>{t('aiCounsel')}</span>
+              </button>
+            )}
 
             <button
               id="nav-btn-consultations"
@@ -241,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <PWAInstallButton variant="navbar" />
 
             {/* Voice Case Filing Button */}
-            {onOpenVoiceCaseFilerModal && (
+            {onOpenVoiceCaseFilerModal && currentUser?.role !== 'lawyer' && (
               <button
                 id="btn-nav-voice-file-case"
                 onClick={onOpenVoiceCaseFilerModal}
@@ -309,7 +313,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center space-x-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-left transition-colors cursor-pointer"
               >
                 <img
-                  src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                  src={currentUser?.role === 'lawyer' ? 'https://ui-avatars.com/api/?name=AG&background=334155&color=fff' : (currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100')}
                   alt={currentUser?.name || 'User'}
                   className="w-7 h-7 rounded-lg object-cover border border-slate-300"
                 />
@@ -329,7 +333,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-3 text-slate-800 animate-in fade-in zoom-in-95">
                   <div className="flex items-center space-x-3 pb-3 border-b border-slate-200">
                     <img
-                      src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                      src={currentUser?.role === 'lawyer' ? 'https://ui-avatars.com/api/?name=AG&background=334155&color=fff' : (currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100')}
                       alt={currentUser?.name || 'User'}
                       className="w-10 h-10 rounded-xl object-cover border border-slate-200"
                     />
@@ -419,16 +423,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <span>{t('overview')}</span>
           </button>
-          <button
-            id="mobile-nav-btn-lawyers"
-            onClick={() => setActiveTab('lawyers')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'lawyers' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5" />
-            <span>{t('findLawyer')}</span>
-          </button>
+          {currentUser?.role !== 'lawyer' && (
+            <button
+              id="mobile-nav-btn-lawyers"
+              onClick={() => setActiveTab('lawyers')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === 'lawyers' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>{t('findLawyer')}</span>
+            </button>
+          )}
           <button
             id="mobile-nav-btn-legal-docs"
             onClick={() => setActiveTab('legal_docs')}
@@ -471,16 +477,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <FileText className="w-3.5 h-3.5" />
             <span>{currentUser?.role === 'lawyer' ? 'Assigned Cases' : t('myCases')}</span>
           </button>
-          <button
-            id="mobile-nav-btn-ai-assistant"
-            onClick={() => setActiveTab('ai_assistant')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === 'ai_assistant' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>{t('aiCounsel')}</span>
-          </button>
+          {currentUser?.role !== 'lawyer' && (
+            <button
+              id="mobile-nav-btn-ai-assistant"
+              onClick={() => setActiveTab('ai_assistant')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === 'ai_assistant' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Scale className="w-3.5 h-3.5" />
+              <span>{t('aiCounsel')}</span>
+            </button>
+          )}
           <button
             id="mobile-nav-btn-consultations"
             onClick={onOpenConsultationsModal}

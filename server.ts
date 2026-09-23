@@ -223,6 +223,32 @@ const defaultGuestUser: User = {
   autoDebitAmount: 2999
 };
 
+const defaultGuestAdvocate: User = {
+  id: 'guest_advocate',
+  name: 'Advocate / Guest',
+  email: 'advocate.guest@justicebridge.in',
+  role: 'lawyer',
+  isVerifiedLawyer: true,
+  barCouncilNumber: 'D/2026/JB',
+  stateBarCouncil: 'Bar Council of Delhi',
+  practiceLocation: 'Delhi High Court & Supreme Court of India',
+  yearsExperience: 8,
+  consultationFee: 1500,
+  membershipActive: true,
+  membershipPlan: 'advocate_annual',
+  avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
+  trialStartDate: nowTime.toISOString(),
+  trialEndsAt: defaultTrialEndTime.toISOString(),
+  trialDaysRemaining: 21,
+  isTrialActive: true,
+  autoPaymentMandateActive: true,
+  mandateMethod: 'upi_autopay',
+  mandateDetails: 'UPI AutoPay (advocate@okhdfcbank)',
+  nextBillingDate: defaultTrialEndTime.toISOString(),
+  mandateStatus: 'active',
+  autoDebitAmount: 5999
+};
+
 // Prototype Pollution Defense: Strict key validation to prevent __proto__, constructor, or prototype manipulation
 function isSafeIdentifier(key: string): boolean {
   return typeof key === 'string' &&
@@ -235,6 +261,7 @@ function isSafeIdentifier(key: string): boolean {
 // In-Memory Database using isolated Map to completely prevent Prototype Pollution
 const usersMap = new Map<string, User>();
 usersMap.set('guest_user', defaultGuestUser);
+usersMap.set('guest_advocate', defaultGuestAdvocate);
 
 function getUser(id: string): User | undefined {
   if (!isSafeIdentifier(id)) return undefined;
@@ -817,35 +844,42 @@ app.post('/api/consultations', apiLimiter, (req, res) => {
   res.status(201).json({ success: true, booking: newBooking });
 });
 
-app.patch('/api/consultations/:id/status', apiLimiter, (req, res) => {
+app.patch('/api/cases/:id/intake', apiLimiter, (req, res) => {
   const { id } = req.params;
-  const { status, notes, meetingLink } = req.body;
+  const { action } = req.body; // 'accept' or 'reject'
   const user = getCurrentUser(req);
 
-  const booking = consultationBookings.find(c => c.id === id);
-  if (!booking) {
-    return res.status(404).json({ error: 'Booking not found' });
+  if (user.role !== 'lawyer' || !user.isVerifiedLawyer) {
+    return res.status(403).json({ error: 'Only verified advocates can perform intake actions.' });
   }
 
-  // Authorization enforcement: Only client, assigned lawyer, or verified advocate can update consultation
-  const isAuthorized = 
-    booking.clientId === user.id || 
-    booking.lawyerId === user.id || 
-    user.role === 'admin' || 
-    (user.role === 'lawyer' && user.isVerifiedLawyer);
-
-  if (!isAuthorized) {
-    return res.status(403).json({
-      error: 'Forbidden: You do not have permission to modify this consultation booking.',
-      securityCode: 'SEC_UNAUTHORIZED_CONSULTATION_UPDATE_BLOCKED'
-    });
+  const caseMatter = casesStore.find(c => c.id === id);
+  if (!caseMatter) {
+    return res.status(404).json({ error: 'Case petition not found' });
   }
 
-  if (status) booking.status = status;
-  if (notes) booking.notes = notes;
-  if (meetingLink) booking.meetingLink = meetingLink;
+  if (action === 'accept') {
+    if (caseMatter.assignedLawyerId !== 'unassigned' && caseMatter.assignedLawyerId !== user.id) {
+        return res.status(400).json({ error: 'Case already assigned to an advocate.' });
+    }
+    // codeql[js/prototype-polluting-assignment]
+    caseMatter.assignedLawyerId = user.id;
+    // codeql[js/prototype-polluting-assignment]
+    caseMatter.assignedLawyerName = user.name;
+    // codeql[js/prototype-polluting-assignment]
+    caseMatter.status = 'Scrutiny';
+  } else if (action === 'reject') {
+    if (!(caseMatter as any).rejectedByLawyerIds) {
+      (caseMatter as any).rejectedByLawyerIds = [];
+    }
+    if (!(caseMatter as any).rejectedByLawyerIds.includes(user.id)) {
+      (caseMatter as any).rejectedByLawyerIds.push(user.id);
+    }
+  } else {
+    return res.status(400).json({ error: 'Invalid intake action.' });
+  }
 
-  res.json({ success: true, booking });
+  res.json({ success: true, case: caseMatter });
 });
 
 // All Invoices for current user
@@ -857,8 +891,16 @@ app.get('/api/invoices', apiLimiter, (req, res) => {
 
 // 4. Case Lookup & Public Search ("Find a Case") with Advanced Filtering
 app.get('/api/cases/search', apiLimiter, (req, res) => {
+  const user = getCurrentUser(req);
   const { query, caseType, status, court, delayRiskScore, sortBy } = req.query;
-  let results = casesStore.map(c => {
+
+  // Filter out cases rejected by this advocate
+  let activeCases = casesStore;
+  if (user && user.role === 'lawyer') {
+    activeCases = activeCases.filter(c => !(c as any).rejectedByLawyerIds?.includes(user.id));
+  }
+
+  let results = activeCases.map(c => {
     // Return sanitized public record (no confidential internal evidence documents exposed in public search)
     return {
       id: c.id,
@@ -879,6 +921,7 @@ app.get('/api/cases/search', apiLimiter, (req, res) => {
       delayRiskScore: c.delayRiskScore,
       delayDays: c.delayDays,
       nextHearingDate: c.nextHearingDate,
+      assignedLawyerId: c.assignedLawyerId || 'unassigned',
       assignedLawyerName: c.assignedLawyerName,
       publicHearingsCount: c.hearings.length,
       publicDocumentsCount: c.documents.length

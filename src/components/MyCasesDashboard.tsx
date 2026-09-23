@@ -127,14 +127,16 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                 {t('completeBarVerificationBtn')}
               </button>
             ) : (
-              <button
-                id="btn-dashboard-file-petition"
-                onClick={onFileNewCase}
-                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold border border-red-700 shadow-md transition-all active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t('btnFileNewPetition')}</span>
-              </button>
+              currentUser?.role !== 'lawyer' && (
+                <button
+                  id="btn-dashboard-file-petition"
+                  onClick={onFileNewCase}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold border border-red-700 shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('btnFileNewPetition')}</span>
+                </button>
+              )
             )}
           </div>
         </div>

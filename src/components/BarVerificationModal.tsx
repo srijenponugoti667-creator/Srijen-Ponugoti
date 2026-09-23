@@ -133,6 +133,16 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
                   />
                 </div>
                 <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Education Qualification (PDF/JPG)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="w-full px-2 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono outline-none focus:border-red-600 text-[10px]"
+                  />
+                </div>
+              </div>
+              
+              <div>
                   <label className="text-slate-300 font-semibold block mb-1">Aadhaar e-Sign Hash</label>
                   <input
                     type="text"
@@ -140,7 +150,6 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
                     disabled
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-slate-500 font-mono"
                   />
-                </div>
               </div>
 
               <div className="p-3 rounded-xl bg-red-950/40 border border-red-900/60 text-[11px] text-red-300 leading-snug">

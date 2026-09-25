@@ -68,7 +68,7 @@ export interface CaseMatter {
   caseNumber: string;
   cnrNumber: string;
   title: string;
-  caseType: 'Commercial Dispute' | 'Constitutional Writ' | 'Cyber Crime' | 'Civil & Property' | 'Corporate Arbitration' | 'Criminal Defense' | 'Family Law';
+  caseType: 'Commercial Dispute' | 'Constitutional Writ' | 'Cyber Crime' | 'Civil & Property' | 'Corporate Arbitration' | 'Criminal Defense' | 'Family Law' | 'Public Interest Litigation (PIL)';
   filingDate: string;
   courtName: string;
   jurisdiction: string;

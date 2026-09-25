@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, FileText, Scale, ShieldCheck, CheckCircle2, Upload, AlertCircle } from 'lucide-react';
 import { User, CaseMatter } from '../types';
 import { getTranslation } from '../languages';
+import { PILInitiationModal } from './PILInitiationModal';
 
 interface FileNewCaseModalProps {
   currentUser: User;
@@ -25,6 +26,7 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
   const [respondent, setRespondent] = useState<string>('');
   const [summaryBrief, setSummaryBrief] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [isPILModalOpen, setIsPILModalOpen] = useState<boolean>(false);
 
   if (!isOpen || !currentUser) return null;
 
@@ -117,6 +119,8 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
                 <option value="Cyber Crime">Cyber Crime & IT</option>
                 <option value="Corporate Arbitration">Corporate Arbitration</option>
                 <option value="Criminal Defense">Criminal Defense</option>
+                <option value="Family Law">Family Law</option>
+                <option value="Public Interest Litigation (PIL)">Public Interest Litigation (PIL)</option>
               </select>
             </div>
 
@@ -132,6 +136,10 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="text-xs text-slate-400">
+            Filing a Public Interest Litigation? <button type="button" onClick={() => setIsPILModalOpen(true)} className="text-indigo-400 hover:text-indigo-300 underline">Initiate PIL here</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -181,6 +189,16 @@ export const FileNewCaseModal: React.FC<FileNewCaseModalProps> = ({
             {loading ? 'Filing Petition & Issuing Digital Scrutiny Receipt...' : 'Submit & Register Legal Case'}
           </button>
         </form>
+
+        <PILInitiationModal
+          currentUser={currentUser}
+          isOpen={isPILModalOpen}
+          onClose={() => setIsPILModalOpen(false)}
+          onPILFiled={(newPIL) => {
+            onCaseFiled(newPIL);
+            onClose();
+          }}
+        />
 
       </div>
     </div>

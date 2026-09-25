@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, AlertTriangle, FileText, Plus, Upload, Clock, Calendar, CheckCircle2, ChevronRight, Eye, Sparkles, Scale, AlertCircle, ArrowUpRight, FileSpreadsheet, User, RefreshCw } from 'lucide-react';
 import { CaseMatter, User as UserType, CaseDocument } from '../types';
 import { getTranslation } from '../languages';
+import { PILStatusVisualizer } from './PILStatusVisualizer';
 
 interface MyCasesDashboardProps {
   currentUser: UserType;
@@ -208,9 +209,13 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                       <span className="px-2.5 py-0.5 rounded-full bg-red-950/60 text-red-300 border border-red-800/40 text-xs font-medium">
                         {caseItem.caseType}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-xs font-semibold">
-                        Stage: {caseItem.status}
-                      </span>
+                      {caseItem.caseType === 'Public Interest Litigation (PIL)' ? (
+                        <PILStatusVisualizer status={caseItem.status as any} />
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 text-xs font-semibold">
+                          Stage: {caseItem.status}
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-cinzel">

@@ -1,5 +1,16 @@
 export type UserRole = 'client' | 'lawyer' | 'admin';
 
+export interface CyberComplaint {
+  id: string;
+  clientId: string;
+  platformName: string;
+  targetUrl: string;
+  abuseType: 'Harassment' | 'Hate Speech' | 'Defamation' | 'Impersonation' | 'Other';
+  impactDescription: string;
+  createdAt: string;
+  status: 'Pending' | 'Reviewing' | 'ActionTaken' | 'Closed';
+}
+
 export interface User {
   id: string;
   name: string;

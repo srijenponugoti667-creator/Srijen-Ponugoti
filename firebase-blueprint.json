@@ -97,6 +97,22 @@
         "paidAt": { "type": "string" }
       },
       "required": ["id", "userId", "amount", "status"]
+    },
+    "cyberComplaints": {
+      "title": "Cyber Complaints",
+      "description": "Reports of social media abuse and cyber-crimes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "platformName": { "type": "string" },
+        "targetUrl": { "type": "string" },
+        "abuseType": { "type": "string" },
+        "impactDescription": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "clientId", "platformName", "targetUrl", "abuseType", "status"]
     }
   }
 }

@@ -3,6 +3,7 @@ import { ShieldCheck, Lock, AlertTriangle, FileText, Plus, Upload, Clock, Calend
 import { CaseMatter, User as UserType, CaseDocument } from '../types';
 import { getTranslation } from '../languages';
 import { PILStatusVisualizer } from './PILStatusVisualizer';
+import { ReportIncidentModal } from './ReportIncidentModal';
 
 interface MyCasesDashboardProps {
   currentUser: UserType;
@@ -30,6 +31,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
   const [aiAnalysisResult, setAiAnalysisResult] = useState<{ [caseId: string]: string }>({});
   const [analyzingCaseId, setAnalyzingCaseId] = useState<string | null>(null);
   const [activeTabSub, setActiveTabSub] = useState<'all' | 'active' | 'documents'>('all');
+  const [isCyberReportModalOpen, setIsCyberReportModalOpen] = useState(false);
 
   const fetchMyCases = async () => {
     try {
@@ -129,6 +131,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
               </button>
             ) : (
               currentUser?.role !== 'lawyer' && (
+              <>
                 <button
                   id="btn-dashboard-file-petition"
                   onClick={onFileNewCase}
@@ -137,7 +140,15 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   <span>{t('btnFileNewPetition')}</span>
                 </button>
-              )
+                <button
+                  onClick={() => setIsCyberReportModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-amber-900 hover:bg-amber-800 text-white text-xs font-bold border border-amber-700 shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Report Cyber Abuse</span>
+                </button>
+              </>
+            )
             )}
           </div>
         </div>
@@ -361,6 +372,13 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
           })}
         </div>
       )}
+
+      <ReportIncidentModal
+        currentUser={currentUser}
+        isOpen={isCyberReportModalOpen}
+        onClose={() => setIsCyberReportModalOpen(false)}
+        onReportFiled={() => setIsCyberReportModalOpen(false)}
+      />
 
     </div>
   );

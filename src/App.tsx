@@ -22,6 +22,7 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { InstallAppBanner } from './components/InstallAppBanner';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
+import { CaseUpdateNotifier } from './components/CaseUpdateNotifier';
 import { User, LawyerProfile, CaseMatter, PaymentInvoice } from './types';
 import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getTranslation } from './languages';
@@ -635,6 +636,9 @@ export default function App() {
 
       {/* Offline Connectivity Toast */}
       <OfflineIndicator />
+
+      {/* Case Update Notifier */}
+      {currentUser.id !== 'guest_user' && <CaseUpdateNotifier userId={currentUser.id} />}
 
       {/* Floating Install App Banner */}
       <InstallAppBanner />

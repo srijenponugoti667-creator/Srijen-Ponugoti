@@ -4,6 +4,7 @@ import { CaseMatter, User as UserType, CaseDocument } from '../types';
 import { getTranslation } from '../languages';
 import { PILStatusVisualizer } from './PILStatusVisualizer';
 import { ReportIncidentModal } from './ReportIncidentModal';
+import { CaseCalendarComponent } from './CaseCalendarComponent';
 
 interface MyCasesDashboardProps {
   currentUser: UserType;
@@ -197,6 +198,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
         </div>
       ) : (
         <div className="space-y-8">
+          <CaseCalendarComponent cases={cases} />
           {cases.map((caseItem) => {
             const hasAiAnalysis = !!aiAnalysisResult[caseItem.id];
             const isAnalyzing = analyzingCaseId === caseItem.id;

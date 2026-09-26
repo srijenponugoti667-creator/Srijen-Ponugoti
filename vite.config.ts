@@ -1,12 +1,48 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+function fallbackFirebaseConfig() {
+  const fallbackJson = JSON.stringify({
+    projectId: "zealous-pod-b09p9",
+    appId: "1:426745217281:web:7be49039d080abd3d2db00",
+    apiKey: "AIzaSyBSRvsaXbQqWbDGyjoS7Z7L8Kb77KxZZwo",
+    authDomain: "zealous-pod-b09p9.firebaseapp.com",
+    firestoreDatabaseId: "ai-studio-justicebridge-03ec9cd8-429b-4eed-b01c-7a64e5b3dffd",
+    storageBucket: "zealous-pod-b09p9.firebasestorage.app",
+    messagingSenderId: "426745217281",
+    measurementId: "",
+    oAuthClientId: "426745217281-9h9u405822hdseuq8bcdom3go4ku5g08.apps.googleusercontent.com",
+    recaptchaSiteKey: ""
+  }, null, 2);
+
+  return {
+    name: 'fallback-firebase-config',
+    resolveId(id: string) {
+      if (id.endsWith('firebase-applet-config.json')) {
+        const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+        if (!fs.existsSync(configPath)) {
+          return '\0virtual:firebase-applet-config.json';
+        }
+      }
+      return null;
+    },
+    load(id: string) {
+      if (id === '\0virtual:firebase-applet-config.json') {
+        return fallbackJson;
+      }
+      return null;
+    }
+  };
+}
 
 export default defineConfig(() => {
   return {
     plugins: [
+      fallbackFirebaseConfig(),
       react(),
       tailwindcss(),
       VitePWA({

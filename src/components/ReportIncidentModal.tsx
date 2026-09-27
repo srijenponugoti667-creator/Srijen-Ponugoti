@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Upload } from 'lucide-react';
 import { User, CyberComplaint } from '../types';
+import { db, storage } from '../firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ReportIncidentModalProps {
   currentUser: User;
@@ -19,7 +22,7 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
   const [targetUrl, setTargetUrl] = useState<string>('');
   const [abuseType, setAbuseType] = useState<CyberComplaint['abuseType']>('Harassment');
   const [impactDescription, setImpactDescription] = useState<string>('');
-  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   if (!isOpen) return null;
@@ -31,24 +34,34 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
     setLoading(true);
 
     try {
-      // Simulated API call (In reality, handle file upload here)
-      const res = await fetch('/api/cyber-complaints/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: currentUser.id,
-          platformName,
-          targetUrl,
-          abuseType,
-          impactDescription,
-        }),
+      let evidenceUrl = '';
+      if (evidenceFile) {
+        const storageRef = ref(storage, `evidence/${currentUser.id}/${Date.now()}_${evidenceFile.name}`);
+        const snapshot = await uploadBytes(storageRef, evidenceFile);
+        evidenceUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      const docRef = await addDoc(collection(db, 'cyberComplaints'), {
+        clientId: currentUser.id,
+        platformName,
+        targetUrl,
+        abuseType,
+        impactDescription,
+        evidenceUrl,
+        createdAt: new Date().toISOString(),
       });
 
-      const data = await res.json();
-      if (data.success && data.complaint) {
-        onReportFiled(data.complaint);
-        onClose();
-      }
+      onReportFiled({
+        id: docRef.id,
+        clientId: currentUser.id,
+        platformName,
+        targetUrl,
+        abuseType,
+        impactDescription,
+        evidenceUrl,
+        createdAt: new Date().toISOString(),
+      });
+      onClose();
     } catch (err) {
       console.error('File report error:', err);
     } finally {
@@ -68,7 +81,7 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
         </div>
 
         <h3 className="text-xl font-bold text-white font-cinzel mb-1">Report Social Media Incident</h3>
-        <p className="text-xs text-slate-400 mb-6">Document abuse or harassment. Include evidence like screenshots.</p>
+        <p className="text-xs text-slate-400 mb-6">Document abuse or harassment. Include evidence like screenshots or videos.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
@@ -98,14 +111,14 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
           </div>
           
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">Evidence (Screenshots)</label>
+            <label className="text-slate-300 font-semibold block mb-1">Evidence (Screenshots or Videos)</label>
             <div className="w-full flex items-center justify-center px-6 pt-5 pb-6 border-2 border-zinc-800 border-dashed rounded-xl bg-zinc-900 hover:border-amber-600 transition-colors">
               <div className="space-y-1 text-center">
                 <Upload className="mx-auto h-8 w-8 text-slate-400" />
                 <div className="flex text-sm text-slate-400">
-                  <label htmlFor="screenshot-upload" className="relative cursor-pointer bg-zinc-900 rounded-md font-medium text-amber-400 hover:text-amber-300">
-                    <span>Upload Screenshot</span>
-                    <input id="screenshot-upload" name="screenshot-upload" type="file" className="sr-only" onChange={(e) => setScreenshot(e.target.files?.[0] || null)} />
+                  <label htmlFor="evidence-upload" className="relative cursor-pointer bg-zinc-900 rounded-md font-medium text-amber-400 hover:text-amber-300">
+                    <span>{evidenceFile ? evidenceFile.name : 'Upload File'}</span>
+                    <input id="evidence-upload" name="evidence-upload" type="file" accept="image/*,video/*" className="sr-only" onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)} />
                   </label>
                 </div>
               </div>

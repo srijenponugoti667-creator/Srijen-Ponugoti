@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
+import { SecurityLogsView } from './components/SecurityLogsView';
 import { MembershipNotificationBanner } from './components/MembershipNotificationBanner';
 import { HeroSection } from './components/HeroSection';
 import { LawyerDirectory } from './components/LawyerDirectory';
@@ -176,6 +177,7 @@ export default function App() {
       <main className="flex-1">
         {activeTab === 'home' && (
           <div>
+            <SecurityLogsView />
             <HeroSection
               currentUser={currentUser}
               onFindLawyerClick={() => setActiveTab('lawyers')}

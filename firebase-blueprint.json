@@ -113,6 +113,25 @@
         "status": { "type": "string" }
       },
       "required": ["id", "clientId", "platformName", "targetUrl", "abuseType", "status"]
+    },
+    "securityLogs": {
+      "title": "Security Logs",
+      "description": "Read-only logs of sensitive user actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "actionType": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "actionType", "timestamp"]
+    }
+  },
+  "firestore": {
+    "securityLogs": {
+      "schema": "securityLogs",
+      "description": "Collection of tamper-proof security logs"
     }
   }
 }

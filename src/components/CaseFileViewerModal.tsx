@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Lock, AlertTriangle, FileText, Download, Upload, CheckCircle2, FileCheck, ShieldAlert, Sparkles, Hash, Eye } from 'lucide-react';
 import { CaseDocument, User } from '../types';
 import { getTranslation } from '../languages';
+import { logSecurityActivity } from '../services/securityLogger';
 
 interface CaseFileViewerModalProps {
   caseId: string | null;
@@ -68,6 +69,12 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
     fetchFiles();
   }, [caseId, currentUser?.id, currentUser?.isVerifiedLawyer]);
 
+  const handleDownload = async () => {
+    if (!selectedDoc) return;
+    await logSecurityActivity('FILE_ACCESS', `User accessed document: ${selectedDoc.title}`);
+    alert(`Simulated secure download of ${selectedDoc.fileName}. Document integrity verified via SHA-256.`);
+  };
+
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadTitle) return;
@@ -87,6 +94,7 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
+        await logSecurityActivity('FILE_UPLOAD', `User uploaded document: ${uploadTitle}`);
         setDocuments((prev) => [...prev, data.document]);
         setSelectedDoc(data.document);
         setShowUploadForm(false);
@@ -343,7 +351,7 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
                         </div>
 
                         <button
-                          onClick={() => alert(`Simulated secure download of ${selectedDoc.fileName}. Document integrity verified via SHA-256.`)}
+                          onClick={handleDownload}
                           className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-red-300 border border-zinc-800 text-xs font-bold shadow-md transition-colors"
                         >
                           <Download className="w-3.5 h-3.5" />

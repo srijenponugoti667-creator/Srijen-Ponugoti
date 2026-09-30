@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Crown, CheckCircle2, ShieldCheck, ArrowRight, CreditCard, QrCode, Building, Clock, Receipt, Download, Sparkles, AlertCircle, Zap, RefreshCw } from 'lucide-react';
+import { logSecurityActivity } from '../services/securityLogger';
 import { User, PaymentInvoice } from '../types';
 import { getTranslation } from '../languages';
 
@@ -94,6 +95,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
 
       const data = await res.json();
       if (data.success && data.user) {
+        await logSecurityActivity('PAYMENT_ACTION', `User registered payment mandate: ${mandateDetailText}`);
         setFeedback({
           type: 'success',
           message: data.message || 'Auto-Payment Mandate successfully registered!'
@@ -147,6 +149,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
       });
       const data = await res.json();
       if (data.success && data.user && data.invoice) {
+        await logSecurityActivity('PAYMENT_ACTION', `Day 22 auto-payment executed: Invoice ${data.invoice.invoiceNumber}`);
         setFeedback({
           type: 'success',
           message: `Day 22 Auto-Payment executed! Invoice ${data.invoice.invoiceNumber} created.`
@@ -179,6 +182,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
       });
       const data = await res.json();
       if (data.success) {
+        await logSecurityActivity('PAYMENT_ACTION', `User completed immediate payment. Invoice: ${data.invoice.invoiceNumber}`);
         setFeedback({
           type: 'success',
           message: `${planTitle} activated immediately! Tax invoice issued.`

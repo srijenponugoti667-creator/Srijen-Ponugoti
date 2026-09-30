@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, User, ShieldCheck, Briefcase, MapPin, Award, CheckCircle2 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { getTranslation } from '../languages';
+import { logSecurityActivity } from '../services/securityLogger';
 
 interface LawyerProfileEditorModalProps {
   currentUser: UserType;
@@ -52,6 +53,7 @@ export const LawyerProfileEditorModal: React.FC<LawyerProfileEditorModalProps> =
 
       const data = await res.json();
       if (res.ok && data.user) {
+        await logSecurityActivity('PROFILE_UPDATE', 'User updated practice profile information.');
         onProfileUpdated(data.user);
         onClose();
       }

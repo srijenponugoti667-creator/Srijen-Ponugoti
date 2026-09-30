@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { ShieldCheck, Lock, Clock, Activity, RefreshCw, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, Clock, Activity, RefreshCw } from 'lucide-react';
 import { User } from '../types';
 
 interface SecurityLog {

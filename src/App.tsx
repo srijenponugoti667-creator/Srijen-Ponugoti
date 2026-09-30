@@ -177,7 +177,6 @@ export default function App() {
       <main className="flex-1">
         {activeTab === 'home' && (
           <div>
-            <SecurityLogsView />
             <HeroSection
               currentUser={currentUser}
               onFindLawyerClick={() => setActiveTab('lawyers')}
@@ -328,6 +327,11 @@ export default function App() {
                     </div>
                   </div>
 
+                </div>
+
+                {/* Tamper-Proof Audit Trail & Security Logs Viewer */}
+                <div className="mt-8">
+                  <SecurityLogsView currentUser={currentUser} />
                 </div>
               </div>
 

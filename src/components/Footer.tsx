@@ -4,11 +4,18 @@ import { getTranslation } from '../languages';
 
 interface FooterProps {
   currentLanguage?: string;
+  onNavigate?: (tab: string) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en' }) => {
+export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en', onNavigate }) => {
   const [activeModal, setActiveModal] = useState<'terms' | 'privacy' | 'refund' | 'contact' | null>(null);
   const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
+
+  const handleLinkClick = (tab: string) => {
+    if (onNavigate) {
+      onNavigate(tab);
+    }
+  };
 
   return (
     <>
@@ -48,11 +55,31 @@ export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en' }) => {
                 {t('platformServices')}
               </h4>
               <ul className="space-y-2 text-slate-400">
-                <li><span>{t('verifiedAdvocatesDir')}</span></li>
-                <li><span>{t('nationalCaseRegistry')}</span></li>
-                <li><span>{t('multiTenantVault')}</span></li>
-                <li><span>{t('automatedNoticeGen')}</span></li>
-                <li><span>{t('aiStatutoryCounsel')}</span></li>
+                <li>
+                  <button onClick={() => handleLinkClick('lawyers')} className="hover:text-white transition-colors cursor-pointer text-left">
+                    {t('verifiedAdvocatesDir')}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleLinkClick('find_case')} className="hover:text-white transition-colors cursor-pointer text-left">
+                    {t('nationalCaseRegistry')}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleLinkClick('my_cases')} className="hover:text-white transition-colors cursor-pointer text-left">
+                    {t('multiTenantVault')}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleLinkClick('legal_docs')} className="hover:text-white transition-colors cursor-pointer text-left">
+                    {t('automatedNoticeGen')}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleLinkClick('ai_assistant')} className="hover:text-white transition-colors cursor-pointer text-left">
+                    {t('aiStatutoryCounsel')}
+                  </button>
+                </li>
               </ul>
             </div>
 

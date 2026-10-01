@@ -661,7 +661,7 @@ export default function App() {
       />
 
       {/* Footer with Terms, Privacy, Refund, and Contact Modals */}
-      <Footer currentLanguage={currentLanguage} />
+      <Footer currentLanguage={currentLanguage} onNavigate={setActiveTab} />
 
     </div>
   );

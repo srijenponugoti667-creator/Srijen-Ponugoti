@@ -20,6 +20,10 @@ export const MembershipNotificationBanner: React.FC<MembershipNotificationBanner
   const [testSuccessMessage, setTestSuccessMessage] = useState<string | null>(null);
 
   if (!currentUser) return null;
+  
+  // Do not show trial notification banner for unauthenticated guests
+  if (currentUser.id === 'guest_user') return null;
+
   const isLawyer = currentUser?.role === 'lawyer';
   
   // Platform is 100% free for lawyers with no subscription fees, trial limits, or payment mandates

@@ -144,16 +144,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {tab === 'register' ? (
             <form onSubmit={handleRegister} className="space-y-4">
               
-              {/* Option A: 21-Day Free Trial Highlight */}
-              <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50 via-white to-sky-50 border border-amber-200 text-xs">
-                <div className="flex items-center space-x-2 text-amber-900 font-extrabold mb-1">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>21-Day All-Access Free Trial Included</span>
+              {/* Free Trial / Partner Access Highlight Banner */}
+              {role === 'lawyer' ? (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 via-white to-teal-50 border border-emerald-300 text-xs">
+                  <div className="flex items-center space-x-2 text-emerald-900 font-extrabold mb-1">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span>Advocate Partner Tier • 100% Free Lifetime Access</span>
+                  </div>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    Advocate membership is <strong>completely free (₹0)</strong>. Practice tools, client discovery, multi-tenant case vault, and judicial lookup have <strong>no subscription fees, no trial expiration, and no auto-debit mandates</strong>.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Start with <strong>21 days free access</strong> (₹0 today). Your auto-payment mandate is scheduled on <strong>Day 22</strong> ({role === 'lawyer' ? '₹5,999/yr' : '₹2,999/yr'}). Cancel anytime with 1-click before Day 22.
-                </p>
-              </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50 via-white to-sky-50 border border-amber-200 text-xs">
+                  <div className="flex items-center space-x-2 text-amber-900 font-extrabold mb-1">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>21-Day All-Access Free Trial Included</span>
+                  </div>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    Start with <strong>21 days free access</strong> (₹0 today). Your auto-payment mandate is scheduled on <strong>Day 22</strong> (₹2,999/yr). Cancel anytime with 1-click before Day 22.
+                  </p>
+                </div>
+              )}
 
               {/* Role Selection */}
               <div>
@@ -293,13 +305,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 active:scale-95 transition-all cursor-pointer"
+                className={`w-full py-3.5 rounded-xl font-bold text-xs shadow-sm flex items-center justify-center space-x-2 active:scale-95 transition-all cursor-pointer ${
+                  role === 'lawyer'
+                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                }`}
               >
                 {loading ? (
                   <span>Creating Account...</span>
                 ) : (
                   <>
-                    <span>Start 21-Day Free Trial</span>
+                    <span>
+                      {role === 'lawyer' ? 'Register Free Advocate Account (100% Free • ₹0)' : 'Start 21-Day Free Trial (₹0 Today)'}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

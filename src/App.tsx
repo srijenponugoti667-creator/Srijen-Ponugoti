@@ -176,7 +176,7 @@ export default function App() {
 
       {/* Main App Content Views */}
       <main className="flex-1">
-        {currentUser.id === 'guest_user' ? (
+        {activeTab === 'home' && currentUser.id === 'guest_user' ? (
           <LandingPage 
             onLoginClick={() => setIsAuthModalOpen(true)}
             onInstallClick={() => showToast('Click the install icon in your browser to install JusticeBridge.')}

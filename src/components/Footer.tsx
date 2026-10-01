@@ -56,29 +56,29 @@ export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en', onNaviga
               </h4>
               <ul className="space-y-2 text-slate-400">
                 <li>
-                  <button onClick={() => handleLinkClick('lawyers')} className="hover:text-white transition-colors cursor-pointer text-left">
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLinkClick('lawyers'); }} className="hover:text-white transition-colors cursor-pointer text-left">
                     {t('verifiedAdvocatesDir')}
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button onClick={() => handleLinkClick('find_case')} className="hover:text-white transition-colors cursor-pointer text-left">
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLinkClick('find_case'); }} className="hover:text-white transition-colors cursor-pointer text-left">
                     {t('nationalCaseRegistry')}
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button onClick={() => handleLinkClick('my_cases')} className="hover:text-white transition-colors cursor-pointer text-left">
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLinkClick('my_cases'); }} className="hover:text-white transition-colors cursor-pointer text-left">
                     {t('multiTenantVault')}
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button onClick={() => handleLinkClick('legal_docs')} className="hover:text-white transition-colors cursor-pointer text-left">
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLinkClick('legal_docs'); }} className="hover:text-white transition-colors cursor-pointer text-left">
                     {t('automatedNoticeGen')}
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button onClick={() => handleLinkClick('ai_assistant')} className="hover:text-white transition-colors cursor-pointer text-left">
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLinkClick('ai_assistant'); }} className="hover:text-white transition-colors cursor-pointer text-left">
                     {t('aiStatutoryCounsel')}
-                  </button>
+                  </a>
                 </li>
               </ul>
             </div>

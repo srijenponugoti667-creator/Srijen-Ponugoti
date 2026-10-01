@@ -68,6 +68,71 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
+  if (isLawyer) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+        <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden text-slate-900">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-900 text-white">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white font-cinzel">
+                  Advocate Partner Portal
+                </h3>
+                <p className="text-xs text-emerald-300">
+                  100% Free Lifetime Practice Access Active
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs leading-relaxed">
+              <span className="font-bold block text-sm mb-1 text-emerald-800">
+                🎉 No Subscription Fees Required
+              </span>
+              Membership is currently 100% free for all verified advocates. You do not need to register an auto-debit mandate, enter credit card details, or pay any annual fees.
+            </div>
+
+            <div className="space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Full Access to Client Evidence & Case Vault</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Verified Bar Council Directory Listing</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Direct Case Petitions & Intake Pipeline</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>High Court & Supreme Court Cause-List Sync</span>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
+            >
+              Return to Practice Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const trialDaysRemaining = currentUser.trialDaysRemaining ?? 21;
   const isTrialActive = currentUser.isTrialActive ?? (trialDaysRemaining > 0);
   const mandateActive = currentUser.autoPaymentMandateActive ?? true;

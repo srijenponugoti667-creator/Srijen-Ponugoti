@@ -21,6 +21,10 @@ export const MembershipNotificationBanner: React.FC<MembershipNotificationBanner
 
   if (!currentUser) return null;
   const isLawyer = currentUser?.role === 'lawyer';
+  
+  // Platform is 100% free for lawyers with no subscription fees, trial limits, or payment mandates
+  if (isLawyer) return null;
+
   const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
 
   const trialDaysRemaining = currentUser.trialDaysRemaining ?? 21;

@@ -188,7 +188,11 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
           <h2 className="text-3xl font-extrabold text-white tracking-tight font-cinzel">
             {t('findLawyer')}
           </h2>
-          <p className="text-slate-400 text-sm mt-1 max-w-2xl">
+          <div className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Membership is currently free for all lawyers—no subscription fees required.</span>
+          </div>
+          <p className="text-slate-400 text-sm mt-2 max-w-2xl">
             {t('filterAdvocatesDesc')}
           </p>
         </div>
@@ -561,11 +565,9 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
                   </div>
 
                   <p className="text-sm text-slate-400 mt-1">{activeLawyerDetail.stateBarCouncil}</p>
-                  <div className="flex items-center space-x-3 mt-2 text-xs text-slate-300">
-                    <span className="font-mono bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
-                      ID: {activeLawyerDetail.barCouncilNumber}
-                    </span>
-                    <span className="text-amber-400 font-semibold">⭐ {activeLawyerDetail.rating} ({activeLawyerDetail.reviewsCount || 0} reviews)</span>
+                  <div className="mt-2 inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-lg bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 text-[10px] font-semibold">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Free Membership Active</span>
                   </div>
                 </div>
               </div>

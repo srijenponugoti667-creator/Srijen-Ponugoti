@@ -212,25 +212,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{t('consultations')}</span>
             </button>
 
-            <button
-              id="nav-btn-membership"
-              onClick={() => setActiveTab('membership')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'membership'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Crown className="w-3.5 h-3.5 text-amber-600" />
-              <span>{t('membership')}</span>
-            </button>
+            {currentUser?.role !== 'lawyer' && (
+              <button
+                id="nav-btn-membership"
+                onClick={() => setActiveTab('membership')}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'membership'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-600" />
+                <span>{t('membership')}</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Controls: Trial Badge, Language, Voice Filer, Persona */}
           <div className="flex items-center space-x-2.5">
             
-            {/* 21-Day Trial Quick Badge in Navbar */}
-            {isTrialActive && (
+            {/* 21-Day Trial Quick Badge in Navbar (Clients only) */}
+            {isTrialActive && currentUser?.role !== 'lawyer' && (
               <button
                 onClick={onOpenPaymentModal}
                 className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-bold shadow-xs cursor-pointer transition-all"

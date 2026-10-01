@@ -84,10 +84,10 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+      <header className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-xs font-semibold mb-2">
             <Scale className="w-3.5 h-3.5 text-red-400" />
@@ -111,10 +111,10 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
             <span>{t('btnFileNewCasePetition')}</span>
           </button>
         )}
-      </div>
+      </header>
 
       {/* Search Bar & Filters */}
-      <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl mb-8">
+      <section className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl mb-8" aria-label="Search and Filter">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           
           {/* Main Search Input */}
@@ -201,7 +201,7 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
             <span className="text-slate-500 font-mono">({cases.length} Matters)</span>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Case List Results */}
       {loading ? (
@@ -249,13 +249,13 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
           {cases.map((c) => {
             const currentStageIdx = getStageIndex(c.status);
             return (
-              <div
+              <article
                 key={c.id}
                 id={`case-card-${c.id}`}
                 className="rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-red-800/60 transition-all p-6 shadow-xl group"
               >
                 {/* Header info */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+                <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="px-2.5 py-1 rounded-md bg-red-950/80 text-red-300 border border-red-800 font-mono text-xs font-bold">
@@ -333,7 +333,7 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
+                </header>
 
                 {/* Litigants & Judge info */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-5 text-xs">
@@ -394,12 +394,12 @@ export const CaseTracker: React.FC<CaseTrackerProps> = ({
                   </div>
                 </div>
 
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-    </div>
+    </article>
   );
 };

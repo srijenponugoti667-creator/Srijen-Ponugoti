@@ -25,7 +25,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
 import { CaseUpdateNotifier } from './components/CaseUpdateNotifier';
 import { User, LawyerProfile, CaseMatter, PaymentInvoice } from './types';
-import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { getTranslation } from './languages';
 
 export default function App() {
@@ -410,9 +410,16 @@ export default function App() {
               <p className="text-slate-600 text-sm mt-2">
                 {t('membershipSubtitle')}
               </p>
-              <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                <span>✨ 21-Day Free Trial on Registration • Auto-Debit Mandate on Day 22</span>
-              </div>
+              {currentUser?.role !== 'lawyer' ? (
+                <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <span>✨ 21-Day Free Trial on Registration • Auto-Debit Mandate on Day 22</span>
+                </div>
+              ) : (
+                <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Advocate Partner Tier: 100% Free Lifetime Practice Access</span>
+                </div>
+              )}
             </div>
 
             {/* Plans Grid */}
@@ -480,33 +487,33 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Advocate Monthly/Annual Plan */}
+              {/* Advocate Free Partner Plan */}
               <div className={`p-8 rounded-3xl border flex flex-col justify-between shadow-xs transition-all ${
                 currentUser?.role === 'lawyer'
-                  ? 'bg-white border-red-400 ring-2 ring-red-400/20 shadow-md'
+                  ? 'bg-white border-emerald-400 ring-2 ring-emerald-400/20 shadow-md'
                   : 'bg-white border-slate-200 hover:border-slate-300'
               }`}>
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="px-3 py-1 rounded-full bg-red-50 text-red-800 border border-red-200 text-xs font-bold uppercase tracking-wider">
-                      {t('advocatePracticePass')}
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold uppercase tracking-wider">
+                      Advocate Partner Access • 100% Free
                     </span>
                     {currentUser?.role === 'lawyer' && (
-                      <span className="text-xs text-red-700 font-bold">{t('yourAccountTier')}</span>
+                      <span className="text-xs text-emerald-700 font-bold">{t('yourAccountTier')}</span>
                     )}
                   </div>
 
                   <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                    {t('monthlyAdvocateMembership')}
+                    Advocate Practice Pass
                   </h3>
 
                   <div className="flex items-baseline space-x-1.5 my-4">
-                    <span className="text-4xl font-extrabold text-slate-900 font-mono">₹5,999</span>
-                    <span className="text-xs text-slate-500 font-semibold">{t('perYearGst')}</span>
+                    <span className="text-4xl font-extrabold text-emerald-700 font-mono">₹0</span>
+                    <span className="text-xs text-slate-500 font-semibold">Free Partner Access (No Dues)</span>
                   </div>
 
                   <p className="text-xs text-slate-600 leading-relaxed mb-6">
-                    {t('advocateMembershipMsg')}
+                    Membership is currently 100% free for all verified advocates—no subscription fees, trial limits, or payment mandates required.
                   </p>
 
                   <div className="space-y-3 text-xs text-slate-700 mb-6">
@@ -528,18 +535,14 @@ export default function App() {
                     </div>
                     <div className="flex items-center space-x-2.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>21-Day Full Access Free Trial Included</span>
+                      <span>100% Complimentary Lifetime Practice Access</span>
                     </div>
                   </div>
                 </div>
 
-                <button
-                  id="btn-lawyer-plan-pay"
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="w-full py-3.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
-                >
-                  {currentUser?.role === 'lawyer' && currentUser?.membershipActive ? `${t('activeMembership')} (₹5,999/yr)` : t('subscribeAdvocateBtn')}
-                </button>
+                <div className="w-full py-3.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs text-center shadow-xs">
+                  ✓ Complimentary Advocate Membership Active
+                </div>
               </div>
 
             </div>

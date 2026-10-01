@@ -106,10 +106,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Main Headline */}
         <div className="text-center max-w-4xl mx-auto">
           <h1 
-            id="main-headline"
             className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight font-cinzel uppercase"
           >
-            {t('heroHeadline1')} <span className="text-red-700">{t('heroHeadline2')}</span> {t('heroHeadline3')}
+            JusticeBridge: Bridging Lawyers & Clients for AI-Powered Legal Acceleration
           </h1>
 
           {/* Subtitle */}
@@ -200,10 +199,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
 
         {/* 3 Value Pillars */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6" aria-label="Core Value Pillars">
           
           {/* Pillar 1: Bridging Lawyers */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
+          <article className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
             <div className="w-11 h-11 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <ShieldCheck className="w-5 h-5 text-red-700" />
             </div>
@@ -216,10 +215,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-red-700 font-bold">
               <span>{t('strictRule1')}</span>
             </div>
-          </div>
+          </article>
 
           {/* Pillar 2: Empowering Clients */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
+          <article className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
             <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <Lock className="w-5 h-5 text-amber-700" />
             </div>
@@ -232,10 +231,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-amber-800 font-bold">
               <span>{t('strictRule2')}</span>
             </div>
-          </div>
+          </article>
 
           {/* Pillar 3: Reducing Delays */}
-          <div className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
+          <article className="p-6 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 transition-all shadow-xs group">
             <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <Clock className="w-5 h-5 text-emerald-700" />
             </div>
@@ -248,9 +247,36 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center text-xs text-emerald-700 font-bold">
               <span>{t('daysSaved')}</span>
             </div>
-          </div>
+          </article>
 
-        </div>
+        </section>
+
+        {/* SEO Descriptive Content Section */}
+        <section className="mt-16 p-8 rounded-3xl bg-slate-100 border border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">India's Premier AI Legal Assistance</h2>
+          <p className="text-slate-700 leading-relaxed">
+            JusticeBridge serves as a comprehensive digital courtroom and legal acceleration network. 
+            We bridge the gap between litigants and experienced lawyers across India using advanced 
+            artificial intelligence. Our platform enables secure case filing, real-time case tracking, 
+            and automated legal document generation in 24 Indian languages, ensuring justice is 
+            accessible, transparent, and swift for all citizens.
+          </p>
+        </section>
+
+        {/* Trust & Credibility Stats */}
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6" aria-label="Trust and Credibility Statistics">
+          {[
+            { label: 'Cases Handled', value: '50,000+', icon: FileText },
+            { label: 'Active Lawyers', value: '2,500+', icon: Briefcase },
+            { label: 'Avg. Delay Reduction', value: '45%', icon: Clock },
+          ].map((stat, i) => (
+            <article key={i} className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm text-center">
+              <stat.icon className="w-10 h-10 text-red-700 mx-auto mb-4" />
+              <p className="text-4xl font-extrabold text-slate-900 mb-2">{stat.value}</p>
+              <p className="text-sm font-semibold text-slate-600 uppercase tracking-wide">{stat.label}</p>
+            </article>
+          ))}
+        </section>
 
       </div>
     </section>

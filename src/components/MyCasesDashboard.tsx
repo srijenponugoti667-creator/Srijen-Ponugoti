@@ -73,10 +73,10 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       
       {/* Client Isolation & Role Verification Security Banner */}
-      <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-red-950/40 to-zinc-900 border border-zinc-800 shadow-xl">
+      <section className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-zinc-900 via-red-950/40 to-zinc-900 border border-zinc-800 shadow-xl" aria-label="Security Banner">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start space-x-3.5">
             <div className="w-10 h-10 rounded-xl bg-red-950/70 border border-red-800/60 flex items-center justify-center flex-shrink-0 text-red-300">
@@ -153,10 +153,10 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Main Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-cinzel">
             {currentUser?.role === 'lawyer' ? t('myCasesTitleLawyer') : t('myCasesTitleClient')}
@@ -174,7 +174,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
             {cases.length} {t('mattersCount')}
           </span>
         </div>
-      </div>
+      </header>
 
       {/* Cases List */}
       {loading ? (
@@ -204,13 +204,13 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
             const isAnalyzing = analyzingCaseId === caseItem.id;
 
             return (
-              <div
+              <article
                 key={caseItem.id}
                 id={`my-case-card-${caseItem.id}`}
                 className="rounded-3xl bg-zinc-900/90 border border-zinc-800 hover:border-red-900/60 transition-all p-6 sm:p-8 shadow-2xl"
               >
                 {/* Case Top Bar */}
-                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 pb-6 border-b border-zinc-800">
+                <header className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 pb-6 border-b border-zinc-800">
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-2.5">
                       <span className="px-2.5 py-1 rounded-md bg-red-950/80 text-red-200 border border-red-800 font-mono text-xs font-bold">
@@ -275,7 +275,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                       <span>{isAnalyzing ? 'Analyzing Bottlenecks...' : 'AI Delay Analyzer'}</span>
                     </button>
                   </div>
-                </div>
+                </header>
 
                 {/* Litigant & Case Brief */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6 text-xs">
@@ -321,8 +321,8 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                 )}
 
                 {/* Hearing Schedule & Next Cause List Date */}
-                <div className="mt-6 pt-6 border-t border-zinc-800">
-                  <div className="flex items-center justify-between mb-4">
+                <section className="mt-6 pt-6 border-t border-zinc-800">
+                  <header className="flex items-center justify-between mb-4">
                     <h4 className="text-xs uppercase font-bold tracking-wider text-slate-400 flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-red-400" />
                       <span>Cause List Schedule & Hearing History</span>
@@ -330,7 +330,7 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                     <span className="text-xs text-slate-400">
                       Next Appearance: <strong className="text-white">{caseItem.nextHearingDate}</strong>
                     </span>
-                  </div>
+                  </header>
 
                   <div className="space-y-3">
                     {caseItem.hearings.map((h) => (
@@ -367,9 +367,9 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
                       </div>
                     ))}
                   </div>
-                </div>
+                </section>
 
-              </div>
+              </article>
             );
           })}
         </div>
@@ -382,6 +382,6 @@ export const MyCasesDashboard: React.FC<MyCasesDashboardProps> = ({
         onReportFiled={() => setIsCyberReportModalOpen(false)}
       />
 
-    </div>
+    </article>
   );
 };

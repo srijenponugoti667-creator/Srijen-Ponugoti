@@ -24,7 +24,7 @@ export interface User {
   yearsExperience?: number;
   specialization?: string[];
   membershipActive: boolean;
-  membershipPlan?: 'client_annual' | 'advocate_annual' | 'advocate_monthly';
+  membershipPlan?: 'client_annual' | 'advocate_annual' | 'advocate_monthly' | 'advocate_free_partner';
   membershipExpiresAt?: string;
   avatar?: string;
   consultationFee?: number;

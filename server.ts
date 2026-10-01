@@ -149,7 +149,23 @@ async function generateGeminiWithFallback(
 // Helper to ensure 21-Day Free Trial & Auto-Payment Mandate (Option A)
 function ensureUserTrial(user: User): User {
   const isLawyer = user.role === 'lawyer';
-  const planFee = isLawyer ? 5999 : 2999;
+  
+  // Lawyers are 100% free with no subscription, no trial expiration, and no mandates
+  if (isLawyer) {
+    user.membershipActive = true;
+    user.isTrialActive = false;
+    user.trialDaysRemaining = undefined;
+    user.autoPaymentMandateActive = false;
+    user.membershipPlan = 'advocate_free_partner';
+    user.autoDebitAmount = 0;
+    user.membershipExpiresAt = undefined;
+    user.trialStartDate = undefined;
+    user.trialEndsAt = undefined;
+    user.nextBillingDate = undefined;
+    return user;
+  }
+
+  const planFee = 2999;
   
   if (!user.trialStartDate) {
     const now = new Date();
@@ -165,7 +181,7 @@ function ensureUserTrial(user: User): User {
     // codeql[js/prototype-polluting-assignment]
     user.mandateMethod = user.mandateMethod ?? 'upi_autopay';
     // codeql[js/prototype-polluting-assignment]
-    user.mandateDetails = user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)');
+    user.mandateDetails = user.mandateDetails ?? 'UPI AutoPay (client@oksbi)';
     // codeql[js/prototype-polluting-assignment]
     user.nextBillingDate = trialEnd.toISOString(); // Day 22 auto-debit
     // codeql[js/prototype-polluting-assignment]
@@ -175,7 +191,7 @@ function ensureUserTrial(user: User): User {
     // codeql[js/prototype-polluting-assignment]
     user.membershipActive = true; // Trial grants full access!
     // codeql[js/prototype-polluting-assignment]
-    user.membershipPlan = isLawyer ? 'advocate_annual' : 'client_annual';
+    user.membershipPlan = 'client_annual';
     // codeql[js/prototype-polluting-assignment]
     user.membershipExpiresAt = trialEnd.toISOString();
   }
@@ -186,7 +202,7 @@ function ensureUserTrial(user: User): User {
     const daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
     user.trialDaysRemaining = daysRemaining;
     user.isTrialActive = daysRemaining > 0 && !user.trialCancelled;
-    user.autoDebitAmount = isLawyer ? 5999 : 2999;
+    user.autoDebitAmount = 2999;
 
     // Enforce consistent expiry: If trial has ended and user has not paid for annual membership, revoke active status
     if (daysRemaining <= 0) {
@@ -235,18 +251,11 @@ const defaultGuestAdvocate: User = {
   yearsExperience: 8,
   consultationFee: 1500,
   membershipActive: true,
-  membershipPlan: 'advocate_annual',
+  membershipPlan: 'advocate_free_partner',
   avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
-  trialStartDate: nowTime.toISOString(),
-  trialEndsAt: defaultTrialEndTime.toISOString(),
-  trialDaysRemaining: 21,
-  isTrialActive: true,
-  autoPaymentMandateActive: true,
-  mandateMethod: 'upi_autopay',
-  mandateDetails: 'UPI AutoPay (advocate@okhdfcbank)',
-  nextBillingDate: defaultTrialEndTime.toISOString(),
-  mandateStatus: 'active',
-  autoDebitAmount: 5999
+  isTrialActive: false,
+  autoPaymentMandateActive: false,
+  autoDebitAmount: 0
 };
 
 // Prototype Pollution Defense: Strict key validation to prevent __proto__, constructor, or prototype manipulation
@@ -1315,15 +1324,47 @@ app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
 
 app.get('/api/membership/status', apiLimiter, (req, res) => {
   const user = getCurrentUser(req);
+  const isLawyer = user.role === 'lawyer';
+
+  if (isLawyer) {
+    return res.json({
+      user,
+      membershipActive: true,
+      membershipExpiresAt: null,
+      trialDaysRemaining: 0,
+      isTrialActive: false,
+      autoPaymentMandateActive: false,
+      nextBillingDate: null,
+      requiredPlan: {
+        planId: 'advocate_free_partner',
+        title: 'Advocate Partner Program',
+        fee: 0,
+        currency: 'INR',
+        period: 'free forever',
+        periodShort: 'Free',
+        trialDays: 0,
+        trialDaysRemaining: 0,
+        isTrialActive: false,
+        autoPaymentMandateActive: false,
+        notificationMessage: 'Membership is currently 100% free for all verified lawyers—no subscription fees required.',
+        features: [
+          'Full Case Files & Evidence Vault Access (Verified Advocates)',
+          'Direct Client Case Ingestion & Retainer Management',
+          'High Court & Supreme Court Cause-list Auto-Sync',
+          'AI Delay Reduction & Hearing Brief Generator',
+          'Bar Council Verified Practice Badge'
+        ]
+      },
+      invoices: []
+    });
+  }
 
   const clientFee = 2999;
-  const advocateFee = 5999;
-  const isLawyer = user.role === 'lawyer';
-  const fee = isLawyer ? advocateFee : clientFee;
+  const fee = clientFee;
 
   let requiredPlan = {
-    planId: isLawyer ? 'advocate_annual' : 'client_annual',
-    title: isLawyer ? 'Advocate Practice Subscription' : 'Client Justice Pass',
+    planId: 'client_annual',
+    title: 'Client Justice Pass',
     fee,
     currency: 'INR',
     period: 'per year',
@@ -1333,26 +1374,16 @@ app.get('/api/membership/status', apiLimiter, (req, res) => {
     isTrialActive: user.isTrialActive ?? true,
     autoPaymentMandateActive: user.autoPaymentMandateActive ?? true,
     mandateMethod: user.mandateMethod ?? 'upi_autopay',
-    mandateDetails: user.mandateDetails ?? (isLawyer ? 'UPI AutoPay (advocate@okhdfcbank)' : 'UPI AutoPay (client@oksbi)'),
+    mandateDetails: user.mandateDetails ?? 'UPI AutoPay (client@oksbi)',
     nextBillingDate: user.nextBillingDate || user.trialEndsAt,
-    notificationMessage: isLawyer
-      ? 'Advocates/Lawyers receive a 21-Day All-Access Free Trial. Auto-payment of ₹5,999 per year will begin on Day 22 via your registered mandate.'
-      : 'Clients receive a 21-Day All-Access Free Trial. Auto-payment of ₹2,999 per year will begin on Day 22 via your registered mandate.',
-    features: isLawyer
-      ? [
-          'Full Case Files & Evidence Vault Access (Verified Advocates)',
-          'Direct Client Case Ingestion & Retainer Management',
-          'High Court & Supreme Court Cause-list Auto-Sync',
-          'AI Delay Reduction & Hearing Brief Generator',
-          'Bar Council Verified Practice Badge'
-        ]
-      : [
-          'Strict Isolated Case Tracker & Real-Time Alerts',
-          'Direct Consultation Booking with Top Verified Advocates',
-          'Court Notice & Order Document Storage Vault',
-          'AI Hearing Delay & Timeline Forecasting',
-          'Dedicated Judicial Support Concierge'
-        ]
+    notificationMessage: 'Clients receive a 21-Day All-Access Free Trial. Auto-payment of ₹2,999 per year will begin on Day 22 via your registered mandate.',
+    features: [
+      'Strict Isolated Case Tracker & Real-Time Alerts',
+      'Direct Consultation Booking with Top Verified Advocates',
+      'Court Notice & Order Document Storage Vault',
+      'AI Hearing Delay & Timeline Forecasting',
+      'Dedicated Judicial Support Concierge'
+    ]
   };
 
   res.json({

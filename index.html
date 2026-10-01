@@ -36,7 +36,14 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
-    <div id="root"></div>
+    <!-- Fallback for static scanners -->
+    <noscript>
+      <h1>JusticeBridge - AI-Powered Legal Directory & Case Tracking</h1>
+      <p>JusticeBridge is India's premier AI-powered legal directory and secure case tracking platform, bridging lawyers and litigants with multilingual judicial tools.</p>
+    </noscript>
+    <div id="root">
+      <h1 class="sr-only">JusticeBridge - AI-Powered Legal Directory & Case Tracking</h1>
+    </div>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {

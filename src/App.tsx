@@ -3,6 +3,7 @@ import { Navbar } from './components/Navbar';
 import { SecurityLogsView } from './components/SecurityLogsView';
 import { MembershipNotificationBanner } from './components/MembershipNotificationBanner';
 import { HeroSection } from './components/HeroSection';
+import { LandingPage } from './components/LandingPage';
 import { LawyerDirectory } from './components/LawyerDirectory';
 import { CaseTracker } from './components/CaseTracker';
 import { MyCasesDashboard } from './components/MyCasesDashboard';
@@ -175,378 +176,385 @@ export default function App() {
 
       {/* Main App Content Views */}
       <main className="flex-1">
-        {activeTab === 'home' && (
-          <div>
-            <HeroSection
-              currentUser={currentUser}
-              onFindLawyerClick={() => setActiveTab('lawyers')}
-              onFindCaseClick={() => setActiveTab('find_case')}
-              onMyCasesClick={() => setActiveTab('my_cases')}
-              onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
-              onOpenVoiceCaseFilerClick={() => setIsVoiceFilerModalOpen(true)}
-              onLegalDocsClick={() => setActiveTab('legal_docs')}
-              currentLanguage={currentLanguage}
-              onLanguageChange={handleLanguageChange}
-            />
+        {currentUser.id === 'guest_user' ? (
+          <LandingPage 
+            onLoginClick={() => setIsAuthModalOpen(true)}
+            onInstallClick={() => showToast('Click the install icon in your browser to install JusticeBridge.')}
+          />
+        ) : (
+          <>
+            {activeTab === 'home' && (
+              <div>
+                <HeroSection
+                  currentUser={currentUser}
+                  onFindLawyerClick={() => setActiveTab('lawyers')}
+                  onFindCaseClick={() => setActiveTab('find_case')}
+                  onMyCasesClick={() => setActiveTab('my_cases')}
+                  onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+                  onOpenVoiceCaseFilerClick={() => setIsVoiceFilerModalOpen(true)}
+                  onLegalDocsClick={() => setActiveTab('legal_docs')}
+                  currentLanguage={currentLanguage}
+                  onLanguageChange={handleLanguageChange}
+                />
 
-            {/* Quick Preview Sections on Home */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-              
-              {/* Featured Section: Find a Lawyer, Legal Docs & Case Tracker Preview Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-                
-                {/* Lawyer Finder Teaser Card */}
-                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all">
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center text-red-700 mb-4 group-hover:scale-105 transition-transform">
-                      <Scale className="w-6 h-6" />
-                    </div>
-                    <span className="text-xs uppercase font-extrabold tracking-wider text-red-700 block mb-1">
-                      {t('advocateDirectory')}
-                    </span>
-                    <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                      {t('connectVerifiedCounsels')}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                      {t('filterAdvocatesDesc')}
-                    </p>
-                  </div>
-
-                  <button
-                    id="btn-home-preview-find-lawyer"
-                    onClick={() => setActiveTab('lawyers')}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
-                  >
-                    <span>{t('browseAdvocatesBtn')}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Legal Documents Generator Teaser Card */}
-                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all">
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-4 group-hover:scale-105 transition-transform">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-700">
-                        {t('legalDocs')}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        Free PDF
-                      </span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                      Automated Legal Documents
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                      Generate court-standard legal notices, mutual non-disclosure agreements (NDAs), affidavits, and rental agreements in seconds.
-                    </p>
-                  </div>
-
-                  <button
-                    id="btn-home-preview-legal-docs"
-                    onClick={() => setActiveTab('legal_docs')}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
-                  >
-                    <span>Draft & Download Legal Docs</span>
-                    <ArrowRight className="w-4 h-4 text-emerald-100" />
-                  </button>
-                </div>
-
-                {/* Case Lookup Teaser Card */}
-                <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all md:col-span-2 lg:col-span-1">
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 mb-4 group-hover:scale-105 transition-transform">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <span className="text-xs uppercase font-extrabold tracking-wider text-slate-600 block mb-1">
-                      {t('caseTrackingDelayMonitor')}
-                    </span>
-                    <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                      {t('trackLitigationsTitle')}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
-                      {t('trackLitigationsDesc')}
-                    </p>
-                  </div>
-
-                  <button
-                    id="btn-home-preview-find-case"
-                    onClick={() => setActiveTab('find_case')}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
-                  >
-                    <span>{t('searchCaseByCnrBtn')}</span>
-                    <ArrowRight className="w-4 h-4 text-slate-600" />
-                  </button>
-                </div>
-
-              </div>
-
-              {/* Data Security Rules Highlights */}
-              <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs mb-12">
-                <div className="text-center max-w-2xl mx-auto mb-8">
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-semibold mb-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-red-700" />
-                    <span>{t('judicialDataSecurity')}</span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-900 font-cinzel">
-                    {t('engineeredForConfidentiality')}
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Quick Preview Sections on Home */}
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                   
-                  {/* Security Rule 1 */}
-                  <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex items-start space-x-4">
-                    <div className="w-10 h-10 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center flex-shrink-0 text-red-800 font-bold font-mono">
-                      01
+                  {/* Featured Section: Find a Lawyer, Legal Docs & Case Tracker Preview Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                    
+                    {/* Lawyer Finder Teaser Card */}
+                    <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all">
+                      <div>
+                        <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center text-red-700 mb-4 group-hover:scale-105 transition-transform">
+                          <Scale className="w-6 h-6" />
+                        </div>
+                        <span className="text-xs uppercase font-extrabold tracking-wider text-red-700 block mb-1">
+                          {t('advocateDirectory')}
+                        </span>
+                        <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
+                          {t('connectVerifiedCounsels')}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
+                          {t('filterAdvocatesDesc')}
+                        </p>
+                      </div>
+
+                      <button
+                        id="btn-home-preview-find-lawyer"
+                        onClick={() => setActiveTab('lawyers')}
+                        className="flex items-center justify-between p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>{t('browseAdvocatesBtn')}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="text-base font-bold text-slate-900 mb-1">
-                        {t('securityRule1Title')}
-                      </h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {t('securityRule1Desc')}
-                      </p>
+
+                    {/* Legal Documents Generator Teaser Card */}
+                    <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all">
+                      <div>
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-4 group-hover:scale-105 transition-transform">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-700">
+                            {t('legalDocs')}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Free PDF
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
+                          Automated Legal Documents
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
+                          Generate court-standard legal notices, mutual non-disclosure agreements (NDAs), affidavits, and rental agreements in seconds.
+                        </p>
+                      </div>
+
+                      <button
+                        id="btn-home-preview-legal-docs"
+                        onClick={() => setActiveTab('legal_docs')}
+                        className="flex items-center justify-between p-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>Draft & Download Legal Docs</span>
+                        <ArrowRight className="w-4 h-4 text-emerald-100" />
+                      </button>
+                    </div>
+
+                    {/* Case Lookup Teaser Card */}
+                    <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between group hover:border-slate-300 hover:shadow-md transition-all md:col-span-2 lg:col-span-1">
+                      <div>
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 mb-4 group-hover:scale-105 transition-transform">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <span className="text-xs uppercase font-extrabold tracking-wider text-slate-600 block mb-1">
+                          {t('caseTrackingDelayMonitor')}
+                        </span>
+                        <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
+                          {t('trackLitigationsTitle')}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
+                          {t('trackLitigationsDesc')}
+                        </p>
+                      </div>
+
+                      <button
+                        id="btn-home-preview-find-case"
+                        onClick={() => setActiveTab('find_case')}
+                        className="flex items-center justify-between p-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>{t('searchCaseByCnrBtn')}</span>
+                        <ArrowRight className="w-4 h-4 text-slate-600" />
+                      </button>
+                    </div>
+
+                  </div>
+
+                  {/* Data Security Rules Highlights */}
+                  <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-xs mb-12">
+                    <div className="text-center max-w-2xl mx-auto mb-8">
+                      <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-semibold mb-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-red-700" />
+                        <span>{t('judicialDataSecurity')}</span>
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900 font-cinzel">
+                        {t('engineeredForConfidentiality')}
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Security Rule 1 */}
+                      <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex items-start space-x-4">
+                        <div className="w-10 h-10 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center flex-shrink-0 text-red-800 font-bold font-mono">
+                          01
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900 mb-1">
+                            {t('securityRule1Title')}
+                          </h4>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {t('securityRule1Desc')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Security Rule 2 */}
+                      <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex items-start space-x-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-900 font-bold font-mono">
+                          02
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900 mb-1">
+                            {t('securityRule2Title')}
+                          </h4>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {t('securityRule2Desc')}
+                          </p>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Tamper-Proof Audit Trail & Security Logs Viewer */}
+                    <div className="mt-8">
+                      <SecurityLogsView currentUser={currentUser} />
                     </div>
                   </div>
 
-                  {/* Security Rule 2 */}
-                  <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex items-start space-x-4">
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-900 font-bold font-mono">
-                      02
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-slate-900 mb-1">
-                        {t('securityRule2Title')}
-                      </h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {t('securityRule2Desc')}
-                      </p>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Tamper-Proof Audit Trail & Security Logs Viewer */}
-                <div className="mt-8">
-                  <SecurityLogsView currentUser={currentUser} />
                 </div>
               </div>
+            )}
 
-            </div>
-          </div>
-        )}
+            {activeTab === 'lawyers' && (
+              <LawyerDirectory
+                currentUser={currentUser}
+                onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
+                onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+                currentLanguage={currentLanguage}
+                onNavigateToGrading={(lawyerId) => {
+                  setSelectedGradingLawyerId(lawyerId);
+                  setActiveTab('grading');
+                }}
+              />
+            )}
 
-        {activeTab === 'lawyers' && (
-          <LawyerDirectory
-            currentUser={currentUser}
-            onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
-            onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
-            currentLanguage={currentLanguage}
-            onNavigateToGrading={(lawyerId) => {
-              setSelectedGradingLawyerId(lawyerId);
-              setActiveTab('grading');
-            }}
-          />
-        )}
+            {activeTab === 'grading' && (
+              <AdvocateGrading
+                currentUser={currentUser}
+                onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
+                currentLanguage={currentLanguage}
+                initialSelectedLawyerId={selectedGradingLawyerId}
+              />
+            )}
 
-        {activeTab === 'grading' && (
-          <AdvocateGrading
-            currentUser={currentUser}
-            onBookConsultation={(lawyer) => setSelectedLawyerForBooking(lawyer)}
-            currentLanguage={currentLanguage}
-            initialSelectedLawyerId={selectedGradingLawyerId}
-          />
-        )}
+            {activeTab === 'find_case' && (
+              <CaseTracker
+                currentUser={currentUser}
+                onSelectCase={(caseId) => setSelectedCaseForFiles(caseId)}
+                onFileNewCaseClick={() => setIsFileCaseModalOpen(true)}
+                currentLanguage={currentLanguage}
+              />
+            )}
 
-        {activeTab === 'find_case' && (
-          <CaseTracker
-            currentUser={currentUser}
-            onSelectCase={(caseId) => setSelectedCaseForFiles(caseId)}
-            onFileNewCaseClick={() => setIsFileCaseModalOpen(true)}
-            currentLanguage={currentLanguage}
-          />
-        )}
+            {activeTab === 'my_cases' && (
+              <MyCasesDashboard
+                currentUser={currentUser}
+                onOpenCaseFiles={(caseId) => setSelectedCaseForFiles(caseId)}
+                onFileNewCase={() => setIsFileCaseModalOpen(true)}
+                onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+                onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+                onOpenVoiceCaseFiler={() => setIsVoiceFilerModalOpen(true)}
+                currentLanguage={currentLanguage}
+              />
+            )}
 
-        {activeTab === 'my_cases' && (
-          <MyCasesDashboard
-            currentUser={currentUser}
-            onOpenCaseFiles={(caseId) => setSelectedCaseForFiles(caseId)}
-            onFileNewCase={() => setIsFileCaseModalOpen(true)}
-            onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
-            onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
-            onOpenVoiceCaseFiler={() => setIsVoiceFilerModalOpen(true)}
-            currentLanguage={currentLanguage}
-          />
-        )}
+            {activeTab === 'analytics' && <DelayReductionAnalytics currentLanguage={currentLanguage} />}
+            {activeTab === 'legal_docs' && <LegalDocumentGenerator currentLanguage={currentLanguage} />}
+            {activeTab === 'ai_assistant' && (
+              <AILegalAssistant
+                onOpenFileCaseModal={() => setIsFileCaseModalOpen(true)}
+                onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
+                currentLanguage={currentLanguage}
+                onLanguageChange={handleLanguageChange}
+              />
+            )}
 
-        {activeTab === 'analytics' && <DelayReductionAnalytics currentLanguage={currentLanguage} />}
-
-        {activeTab === 'legal_docs' && <LegalDocumentGenerator currentLanguage={currentLanguage} />}
-
-        {activeTab === 'ai_assistant' && (
-          <AILegalAssistant
-            onOpenFileCaseModal={() => setIsFileCaseModalOpen(true)}
-            onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
-            currentLanguage={currentLanguage}
-            onLanguageChange={handleLanguageChange}
-          />
-        )}
-
-        {activeTab === 'membership' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            
-            {/* Membership Header */}
-            <div className="text-center max-w-3xl mx-auto mb-10">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold mb-3">
-                <Crown className="w-3.5 h-3.5 text-amber-600" />
-                <span>{t('transparentMembership')}</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-cinzel">
-                {t('membershipTitle')}
-              </h2>
-              <p className="text-slate-600 text-sm mt-2">
-                {t('membershipSubtitle')}
-              </p>
-              {currentUser?.role !== 'lawyer' ? (
-                <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                  <span>✨ 21-Day Free Trial on Registration • Auto-Debit Mandate on Day 22</span>
-                </div>
-              ) : (
-                <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Advocate Partner Tier: 100% Free Lifetime Practice Access</span>
-                </div>
-              )}
-            </div>
-
-            {/* Plans Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
-              
-              {/* Client Annual Plan */}
-              <div className={`p-8 rounded-3xl border flex flex-col justify-between shadow-xs transition-all ${
-                currentUser?.role === 'client'
-                  ? 'bg-white border-amber-400 ring-2 ring-amber-400/20 shadow-md'
-                  : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}>
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-bold uppercase tracking-wider">
-                      {t('clientJusticePass')}
-                    </span>
-                    {currentUser?.role === 'client' && (
-                      <span className="text-xs text-amber-700 font-bold">{t('yourAccountTier')}</span>
-                    )}
+            {activeTab === 'membership' && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                
+                {/* Membership Header */}
+                <div className="text-center max-w-3xl mx-auto mb-10">
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold mb-3">
+                    <Crown className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{t('transparentMembership')}</span>
                   </div>
-
-                  <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                    {t('annualClientMembership')}
-                  </h3>
-
-                  <div className="flex items-baseline space-x-1.5 my-4">
-                    <span className="text-4xl font-extrabold text-slate-900 font-mono">₹2,999</span>
-                    <span className="text-xs text-slate-500 font-semibold">{t('perYearGst')}</span>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed mb-6">
-                    {t('clientMembershipMsg')}
+                  <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-cinzel">
+                    {t('membershipTitle')}
+                  </h2>
+                  <p className="text-slate-600 text-sm mt-2">
+                    {t('membershipSubtitle')}
                   </p>
-
-                  <div className="space-y-3 text-xs text-slate-700 mb-6">
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('pillar2Title')}</span>
+                  {currentUser?.role !== 'lawyer' ? (
+                    <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                      <span>✨ 21-Day Free Trial on Registration • Auto-Debit Mandate on Day 22</span>
                     </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('nationalCaseRegistry')}</span>
+                  ) : (
+                    <div className="mt-3 inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Advocate Partner Tier: 100% Free Lifetime Practice Access</span>
                     </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('bookConsultation')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('aiDelayAnalysis')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>21-Day Full Access Free Trial Included</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <button
-                  id="btn-client-plan-pay"
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
-                >
-                  {currentUser?.role === 'client' && currentUser?.membershipActive ? `${t('activeMembership')} (₹2,999/yr)` : t('subscribeClientBtn')}
-                </button>
+                {/* Plans Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
+                  
+                  {/* Client Annual Plan */}
+                  <div className={`p-8 rounded-3xl border flex flex-col justify-between shadow-xs transition-all ${
+                    currentUser?.role === 'client'
+                      ? 'bg-white border-amber-400 ring-2 ring-amber-400/20 shadow-md'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-bold uppercase tracking-wider">
+                          {t('clientJusticePass')}
+                        </span>
+                        {currentUser?.role === 'client' && (
+                          <span className="text-xs text-amber-700 font-bold">{t('yourAccountTier')}</span>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
+                        {t('annualClientMembership')}
+                      </h3>
+
+                      <div className="flex items-baseline space-x-1.5 my-4">
+                        <span className="text-4xl font-extrabold text-slate-900 font-mono">₹2,999</span>
+                        <span className="text-xs text-slate-500 font-semibold">{t('perYearGst')}</span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                        {t('clientMembershipMsg')}
+                      </p>
+
+                      <div className="space-y-3 text-xs text-slate-700 mb-6">
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('pillar2Title')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('nationalCaseRegistry')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('bookConsultation')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('aiDelayAnalysis')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>21-Day Full Access Free Trial Included</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      id="btn-client-plan-pay"
+                      onClick={() => setIsPaymentModalOpen(true)}
+                      className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
+                    >
+                      {currentUser?.role === 'client' && currentUser?.membershipActive ? `${t('activeMembership')} (₹2,999/yr)` : t('subscribeClientBtn')}
+                    </button>
+                  </div>
+
+                  {/* Advocate Free Partner Plan */}
+                  <div className={`p-8 rounded-3xl border flex flex-col justify-between shadow-xs transition-all ${
+                    currentUser?.role === 'lawyer'
+                      ? 'bg-white border-emerald-400 ring-2 ring-emerald-400/20 shadow-md'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}>
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold uppercase tracking-wider">
+                          Advocate Partner Access • 100% Free
+                        </span>
+                        {currentUser?.role === 'lawyer' && (
+                          <span className="text-xs text-emerald-700 font-bold">{t('yourAccountTier')}</span>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
+                        Advocate Practice Pass
+                      </h3>
+
+                      <div className="flex items-baseline space-x-1.5 my-4">
+                        <span className="text-4xl font-extrabold text-emerald-700 font-mono">₹0</span>
+                        <span className="text-xs text-slate-500 font-semibold">Free Partner Access (No Dues)</span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                        Membership is currently 100% free for all verified advocates—no subscription fees, trial limits, or payment mandates required.
+                      </p>
+
+                      <div className="space-y-3 text-xs text-slate-700 mb-6">
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('securityRule1Title')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('bciVerifiedDirectoryBadge')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('judicialLookupDesc')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>{t('aiStatutoryCounsel')}</span>
+                        </div>
+                        <div className="flex items-center space-x-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span>100% Complimentary Lifetime Practice Access</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full py-3.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs text-center shadow-xs">
+                      ✓ Complimentary Advocate Membership Active
+                    </div>
+                  </div>
+
+                </div>
               </div>
-
-              {/* Advocate Free Partner Plan */}
-              <div className={`p-8 rounded-3xl border flex flex-col justify-between shadow-xs transition-all ${
-                currentUser?.role === 'lawyer'
-                  ? 'bg-white border-emerald-400 ring-2 ring-emerald-400/20 shadow-md'
-                  : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}>
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold uppercase tracking-wider">
-                      Advocate Partner Access • 100% Free
-                    </span>
-                    {currentUser?.role === 'lawyer' && (
-                      <span className="text-xs text-emerald-700 font-bold">{t('yourAccountTier')}</span>
-                    )}
-                  </div>
-
-                  <h3 className="text-2xl font-bold text-slate-900 font-cinzel mb-2">
-                    Advocate Practice Pass
-                  </h3>
-
-                  <div className="flex items-baseline space-x-1.5 my-4">
-                    <span className="text-4xl font-extrabold text-emerald-700 font-mono">₹0</span>
-                    <span className="text-xs text-slate-500 font-semibold">Free Partner Access (No Dues)</span>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed mb-6">
-                    Membership is currently 100% free for all verified advocates—no subscription fees, trial limits, or payment mandates required.
-                  </p>
-
-                  <div className="space-y-3 text-xs text-slate-700 mb-6">
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('securityRule1Title')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('bciVerifiedDirectoryBadge')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('judicialLookupDesc')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>{t('aiStatutoryCounsel')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span>100% Complimentary Lifetime Practice Access</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="w-full py-3.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs text-center shadow-xs">
-                  ✓ Complimentary Advocate Membership Active
-                </div>
-              </div>
-
-            </div>
-          </div>
+            )}
+          </>
         )}
       </main>
 

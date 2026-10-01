@@ -152,32 +152,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <Search className="w-4 h-4 text-slate-600" />
               <span>{t('btnFindCase')}</span>
             </button>
+          </div>
 
-            {/* Button: Legal Document Generator */}
+          {/* Tertiary Action Links */}
+          <div className="mt-6 flex items-center justify-center gap-6 text-xs text-slate-500 font-semibold uppercase tracking-wider">
             {onLegalDocsClick && (
-              <button
-                id="btn-hero-legal-docs"
-                onClick={onLegalDocsClick}
-                className="w-full sm:w-auto flex items-center justify-center space-x-2.5 px-6 py-3.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-xs transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <FileText className="w-4 h-4 text-emerald-600" />
-                <span>{t('legalDocs')}</span>
-              </button>
+              <button onClick={onLegalDocsClick} className="hover:text-red-700 transition-colors">Legal Docs</button>
             )}
-
-            {/* PWA Mobile Install Button */}
-            <PWAInstallButton variant="hero" />
-
-            {/* Secondary Action: My Cases */}
-            <button
-              id="btn-hero-my-cases"
-              onClick={onMyCasesClick}
-              className="w-full sm:w-auto flex items-center justify-center space-x-2 px-5 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs border border-slate-300 transition-all cursor-pointer"
-            >
-              <span>{currentUser?.role === 'lawyer' ? t('openAdvocateVault') : t('viewMyIsolatedCases')}</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
-            </button>
-
+            <button onClick={onMyCasesClick} className="hover:text-red-700 transition-colors">My Cases</button>
+            <PWAInstallButton variant="text" />
           </div>
 
           {/* Quick Search Bar Snippet */}

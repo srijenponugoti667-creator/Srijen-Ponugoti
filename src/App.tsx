@@ -19,6 +19,8 @@ import { LawyerProfileEditorModal } from './components/LawyerProfileEditorModal'
 import { LegalDocumentGenerator } from './components/LegalDocumentGenerator';
 import { AILegalAssistant } from './components/AILegalAssistant';
 import { AdvocateGrading } from './components/AdvocateGrading';
+import { AdminManagementDashboard } from './components/AdminManagementDashboard';
+import { BusinessSetupPage } from './components/BusinessSetupPage';
 import { VoiceCaseFilerModal } from './components/VoiceCaseFilerModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { InstallAppBanner } from './components/InstallAppBanner';
@@ -96,6 +98,9 @@ export default function App() {
 
   useEffect(() => {
     fetchCurrentUser();
+    if (window.location.pathname === '/admin-portal') {
+      setActiveTab('admin');
+    }
   }, []);
 
   // Handle switching personas for live testing
@@ -138,33 +143,37 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-slate-900 selection:text-white pb-24 xl:pb-0">
       
-      {/* 1. Global Navigation Bar */}
-      <Navbar
-        currentUser={currentUser}
-        availablePersonas={availablePersonas}
-        onSwitchPersona={handleSwitchPersona}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
-        onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onOpenConsultationsModal={() => setIsConsultationsModalOpen(true)}
-        onOpenProfileEditorModal={() => setIsProfileEditorModalOpen(true)}
-        onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
-        currentLanguage={currentLanguage}
-        onLanguageChange={handleLanguageChange}
-      />
+      {activeTab !== 'admin' && (
+        <>
+          {/* 1. Global Navigation Bar */}
+          <Navbar
+            currentUser={currentUser}
+            availablePersonas={availablePersonas}
+            onSwitchPersona={handleSwitchPersona}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+            onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
+            onOpenConsultationsModal={() => setIsConsultationsModalOpen(true)}
+            onOpenProfileEditorModal={() => setIsProfileEditorModalOpen(true)}
+            onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
+            currentLanguage={currentLanguage}
+            onLanguageChange={handleLanguageChange}
+          />
 
-      {/* 2. Membership Notification Banner (Rules: Client ₹2,999/yr, Advocate ₹5,999/yr with 21-Day Free Trial) */}
-      <MembershipNotificationBanner
-        currentUser={currentUser}
-        onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
-        onAutoPayTriggered={(updatedUser, inv) => {
-          setCurrentUser(updatedUser);
-          showToast(`Day 22 Auto-Payment executed! Invoice ${inv.invoiceNumber} generated.`);
-        }}
-        currentLanguage={currentLanguage}
-      />
+          {/* 2. Membership Notification Banner */}
+          <MembershipNotificationBanner
+            currentUser={currentUser}
+            onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+            onAutoPayTriggered={(updatedUser, inv) => {
+              setCurrentUser(updatedUser);
+              showToast(`Day 22 Auto-Payment executed! Invoice ${inv.invoiceNumber} generated.`);
+            }}
+            currentLanguage={currentLanguage}
+          />
+        </>
+      )}
 
       {/* Toast Alert */}
       {toastMessage && (
@@ -176,7 +185,15 @@ export default function App() {
 
       {/* Main App Content Views */}
       <main className="flex-1">
-        {activeTab === 'home' && currentUser.id === 'guest_user' ? (
+        {activeTab === 'admin' ? (
+          <AdminManagementDashboard
+            currentUser={currentUser}
+            onStaffLoginSuccess={(staffUser) => {
+              setCurrentUser(staffUser);
+              showToast(`Logged into Admin Portal as ${staffUser.email}`);
+            }}
+          />
+        ) : activeTab === 'home' && currentUser.id === 'guest_user' ? (
           <LandingPage 
             onLoginClick={() => setIsAuthModalOpen(true)}
             onInstallClick={() => showToast('Click the install icon in your browser to install JusticeBridge.')}
@@ -368,6 +385,12 @@ export default function App() {
                 initialSelectedLawyerId={selectedGradingLawyerId}
               />
             )}
+            
+            {activeTab === 'admin' && (currentUser.role === 'admin' || currentUser.role === 'team_member') && (
+              <AdminManagementDashboard currentUser={currentUser} />
+            )}
+            
+            {activeTab === 'business_setup' && <BusinessSetupPage />}
 
             {activeTab === 'find_case' && (
               <CaseTracker
@@ -622,10 +645,14 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         availablePersonas={availablePersonas}
         onSwitchPersona={handleSwitchPersona}
-        onAuthSuccess={(newUser) => {
+        onAuthSuccess={(newUser, openAdminTab) => {
           setCurrentUser(newUser);
-          fetchCurrentUser();
-          showToast(`Welcome to JusticeBridge, ${newUser.name}!`);
+          if (openAdminTab || newUser.role === 'admin' || newUser.role === 'team_member') {
+            setActiveTab('admin');
+            showToast(`Admin Portal unlocked for ${newUser.email}`);
+          } else {
+            showToast(`Welcome to JusticeBridge, ${newUser.name}!`);
+          }
         }}
         currentLanguage={currentLanguage}
       />

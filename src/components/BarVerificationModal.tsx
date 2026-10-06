@@ -46,13 +46,14 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/lawyers/verify', {
+      const res = await fetch('/api/lawyers/submit-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lawyerId: currentUser.id,
           barCouncilNumber: barNumber,
           stateBarCouncil: stateBar,
+          verificationStatus: 'pending' // Set status to pending
         }),
       });
 
@@ -61,7 +62,10 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
         setLoading(false);
         if (data.success) {
           setSuccess(true);
-          onVerificationSuccess(data.user);
+          // If status is 'verified', advocate was auto-verified
+          if (data.status === 'verified') {
+            onVerificationSuccess(currentUser); // Trigger UI update for instant access
+          }
         }
       }, 1000);
     } catch (err) {
@@ -172,18 +176,18 @@ export const BarVerificationModal: React.FC<BarVerificationModalProps> = ({
             </div>
 
             <h4 className="text-2xl font-bold text-white font-cinzel">
-              Advocate Verification Approved!
+              Verification Request Submitted!
             </h4>
 
             <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
-              Your credentials (<span className="font-mono text-emerald-400">{barNumber}</span>) have been verified against the {stateBar}. Rule 1 full case files access is now active.
+              Your credentials (<span className="font-mono text-emerald-400">{barNumber}</span>) have been submitted to the compliance team for review against the {stateBar}. You will be notified once the verification process is complete.
             </p>
 
             <button
               onClick={onClose}
               className="px-6 py-2.5 rounded-xl bg-red-900 hover:bg-red-800 text-white font-bold text-xs border border-red-700 shadow-md"
             >
-              Access Verified Case Files Now
+              Close & Continue
             </button>
           </div>
         )}

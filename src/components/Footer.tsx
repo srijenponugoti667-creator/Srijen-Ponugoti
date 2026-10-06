@@ -121,6 +121,11 @@ export const Footer: React.FC<FooterProps> = ({ currentLanguage = 'en', onNaviga
                     {t('grievanceContact')}
                   </button>
                 </li>
+                <li>
+                  <a href="/business-setup" onClick={(e) => { e.preventDefault(); handleLinkClick('business_setup'); }} className="hover:text-white transition-colors cursor-pointer text-left">
+                    Business Setup Guide
+                  </a>
+                </li>
               </ul>
             </div>
 

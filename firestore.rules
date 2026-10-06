@@ -1,37 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read/write their own profile, or lawyers/clients in booking context
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && (request.auth.uid == userId || resource == null);
-    }
     
-    // Cases require authentication, readable by client or assigned lawyer
-    match /cases/{caseId} {
-      allow read, write: if true;
-    }
-    
-    // Consultations
-    match /consultations/{consultationId} {
-      allow read, write: if true;
-    }
-    
-    // Documents
-    match /documents/{docId} {
-      allow read, write: if true;
-    }
-    
-    // Payments
-    match /payments/{paymentId} {
-      allow read, write: if true;
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'srijenponugoti667@gmail.com'; }
+    function isTeamMember() { return isSignedIn() && getUserData().role == 'team_member'; }
+    function isAuthorizedForVerification() { return isAdmin() || isTeamMember(); }
+
+    // Verification Requests
+    match /verificationRequests/{requestId} {
+      allow read: if isAuthorizedForVerification();
+      allow create: if isSignedIn(); // Advocates can submit
+      allow update: if isAuthorizedForVerification() && (
+        isAdmin() || 
+        (isTeamMember() && 
+         request.resource.data.status in ['approved', 'rejected'] && 
+         resource.data.status in ['pending', 'rejected'])
+      );
     }
 
-    // Security Logs - Write only, read own, no updates/deletes
-    match /securityLogs/{logId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow update, delete: if false;
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

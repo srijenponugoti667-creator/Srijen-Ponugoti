@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import rateLimit from 'express-rate-limit';
+import { WebSocketServer } from 'ws';
 import { GoogleGenAI } from '@google/genai';
 import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';
 
@@ -34,6 +35,18 @@ app.use(apiLimiter);
 // and routes all incoming traffic exclusively to port 3000.
 // PORT must strictly be 3000 in all environments to prevent EADDRINUSE collisions.
 const PORT = 3000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+const wss = new WebSocketServer({ server });
+wss.on('connection', (ws) => {
+  console.log('Client connected to Live API');
+  ws.on('message', (message) => {
+    // Proxy to Live API
+    console.log('Received:', message);
+  });
+});
 
 // Permissive CORS & Asset Serving for PWA Builders and external verification crawlers
 app.use((req, res, next) => {
@@ -649,6 +662,287 @@ app.post('/api/lawyers/verify', apiLimiter, (req, res) => {
   });
 });
 
+// Automated AI-Powered Lawyer Verification Endpoint -> Updated to Manual Team Verification Queue
+interface TeamMemberRecord {
+  email: string;
+  name: string;
+  role: 'admin' | 'team_member';
+  addedAt: string;
+  passwordSalt?: string;
+  passwordHash?: string;
+}
+
+const ADMIN_EMAIL = 'srijenponugoti667@gmail.com';
+const teamMembersList: TeamMemberRecord[] = [
+  {
+    email: ADMIN_EMAIL,
+    name: 'Srijen Ponugoti (Founder & Super Admin)',
+    role: 'admin',
+    addedAt: new Date().toISOString()
+  }
+];
+
+function hashStaffPassword(password: string, salt: string): string {
+  return crypto.scryptSync(password, salt, 64).toString('hex');
+}
+
+function verifyStaffPassword(password: string, salt: string, storedHash: string): boolean {
+  const candidateHash = hashStaffPassword(password, salt);
+  const a = Buffer.from(candidateHash, 'hex');
+  const b = Buffer.from(storedHash, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+app.post('/api/auth/staff-login', apiLimiter, (req, res) => {
+  const { email, password, isSettingPassword, name } = req.body;
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Valid email is required for staff login.' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'Please enter a password of at least 6 characters.' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const isSuperAdmin = normalizedEmail === ADMIN_EMAIL;
+  const teamRecord = teamMembersList.find(m => m.email.toLowerCase() === normalizedEmail);
+
+  if (!isSuperAdmin && !teamRecord) {
+    return res.status(403).json({
+      error: 'Access Denied: Your email is not authorized in the JusticeBridge Verification Team. Ask the Founder/Admin (srijenponugoti667@gmail.com) to add your email first.'
+    });
+  }
+
+  const targetRecord = teamRecord!;
+
+  // Handle First-Time Password Setup or Sign-In
+  if (!targetRecord.passwordHash || !targetRecord.passwordSalt) {
+    // First time logging in: save their new password hash automatically!
+    const salt = crypto.randomBytes(16).toString('hex');
+    targetRecord.passwordSalt = salt;
+    targetRecord.passwordHash = hashStaffPassword(password, salt);
+  } else if (isSettingPassword) {
+    return res.status(400).json({
+      error: 'A password is already set for this account. Please switch to "Sign In with Password" and enter your existing password.'
+    });
+  } else {
+    const valid = verifyStaffPassword(password, targetRecord.passwordSalt, targetRecord.passwordHash);
+    if (!valid) {
+      return res.status(401).json({
+        error: 'Incorrect password. Please try again.'
+      });
+    }
+  }
+
+  const assignedRole: 'admin' | 'team_member' = isSuperAdmin ? 'admin' : 'team_member';
+  const staffId = isSuperAdmin ? 'admin_srijen' : `team_${normalizedEmail.replace(/[^a-z0-9]/g, '_')}`;
+
+  const staffUser: User = {
+    id: staffId,
+    name: name || targetRecord.name || (isSuperAdmin ? 'Srijen Ponugoti (Admin)' : normalizedEmail.split('@')[0]),
+    email: normalizedEmail,
+    role: assignedRole,
+    membershipActive: true,
+    avatar: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name || targetRecord.name || normalizedEmail) + '&background=991b1b&color=fff'
+  };
+
+  users[staffId] = staffUser;
+  const sessionToken = createSessionToken(staffId);
+
+  res.json({
+    success: true,
+    user: staffUser,
+    sessionToken
+  });
+});
+
+app.post('/api/auth/staff-reauth', apiLimiter, (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const teamRecord = teamMembersList.find(m => m.email.toLowerCase() === normalizedEmail);
+  if (!teamRecord || !teamRecord.passwordHash || !teamRecord.passwordSalt) {
+    return res.status(401).json({ error: 'Account password not found.' });
+  }
+  const valid = verifyStaffPassword(String(password), teamRecord.passwordSalt, teamRecord.passwordHash);
+  if (!valid) {
+    return res.status(401).json({ error: 'Incorrect password.' });
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/admin/overview', apiLimiter, (req, res) => {
+  const allLawyerUsers = Object.values(users).filter(u => u.role === 'lawyer');
+  const lawyerRecords = lawyersDirectory.map(dirLawyer => {
+    const userObj = users[dirLawyer.id];
+    return {
+      id: dirLawyer.id,
+      name: dirLawyer.name,
+      email: dirLawyer.contactEmail || userObj?.email || '',
+      phone: dirLawyer.phone || userObj?.phone || '',
+      barCouncilNumber: dirLawyer.barCouncilNumber,
+      stateBarCouncil: dirLawyer.stateBarCouncil,
+      location: dirLawyer.location,
+      experienceYears: dirLawyer.experienceYears,
+      isVerified: dirLawyer.isVerified,
+      verificationStatus: (userObj as any)?.verificationStatus || (dirLawyer.isVerified ? 'approved' : 'pending'),
+      verifiedBy: (userObj as any)?.verifiedBy || null,
+      verifiedAt: (userObj as any)?.verifiedAt || null
+    };
+  });
+
+  // Also include any lawyer in users map not yet in lawyersDirectory
+  allLawyerUsers.forEach(u => {
+    if (!lawyerRecords.some(r => r.id === u.id)) {
+      lawyerRecords.push({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone || '',
+        barCouncilNumber: u.barCouncilNumber || 'PENDING',
+        stateBarCouncil: u.stateBarCouncil || 'Bar Council of India',
+        location: u.practiceLocation || 'India',
+        experienceYears: u.yearsExperience || 1,
+        isVerified: Boolean(u.isVerifiedLawyer),
+        verificationStatus: (u as any).verificationStatus || (u.isVerifiedLawyer ? 'approved' : 'pending'),
+        verifiedBy: (u as any).verifiedBy || null,
+        verifiedAt: (u as any).verifiedAt || null
+      });
+    }
+  });
+
+  res.json({
+    lawyers: lawyerRecords,
+    teamMembers: teamMembersList
+  });
+});
+
+app.post('/api/admin/team', apiLimiter, (req, res) => {
+  const { email, name, adminEmail } = req.body;
+  if (!adminEmail || String(adminEmail).trim().toLowerCase() !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Only the Super Admin (Srijen) can add team members.' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'Please provide a valid email address.' });
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  if (teamMembersList.some(m => m.email.toLowerCase() === cleanEmail)) {
+    return res.status(400).json({ error: 'This email is already on your verification team.' });
+  }
+  const newMember: TeamMemberRecord = {
+    email: cleanEmail,
+    name: name ? String(name).trim() : cleanEmail.split('@')[0],
+    role: cleanEmail === ADMIN_EMAIL ? 'admin' : 'team_member',
+    addedAt: new Date().toISOString()
+  };
+  teamMembersList.push(newMember);
+  res.json({ success: true, teamMembers: teamMembersList });
+});
+
+app.delete('/api/admin/team/:email', apiLimiter, (req, res) => {
+  const targetEmail = decodeURIComponent(req.params.email).trim().toLowerCase();
+  const adminEmail = String(req.query.adminEmail || '').trim().toLowerCase();
+  if (adminEmail !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Only the Super Admin (Srijen) can remove team members.' });
+  }
+  if (targetEmail === ADMIN_EMAIL) {
+    return res.status(400).json({ error: 'Cannot remove the Founder/Super Admin account.' });
+  }
+  const idx = teamMembersList.findIndex(m => m.email.toLowerCase() === targetEmail);
+  if (idx !== -1) {
+    teamMembersList.splice(idx, 1);
+  }
+  res.json({ success: true, teamMembers: teamMembersList });
+});
+
+app.post('/api/admin/lawyers/:id/verify-action', apiLimiter, (req, res) => {
+  const { id } = req.params;
+  const { action, actorEmail, actorRole } = req.body; // action: 'approve' | 'reject' | 'revoke'
+  const normalizedActor = String(actorEmail || '').trim().toLowerCase();
+  const isSuperAdmin = normalizedActor === ADMIN_EMAIL || actorRole === 'admin';
+  const isTeam = teamMembersList.some(m => m.email.toLowerCase() === normalizedActor) || actorRole === 'team_member';
+
+  if (!isSuperAdmin && !isTeam) {
+    return res.status(403).json({ error: 'Unauthorized: Only Admin or Verification Team members can perform this action.' });
+  }
+
+  const user = isSafeIdentifier(id) ? users[id] : undefined;
+  const dirLawyer = lawyersDirectory.find(l => l.id === id);
+
+  if (!user && !dirLawyer) {
+    return res.status(404).json({ error: 'Advocate record not found.' });
+  }
+
+  const currentlyApproved = Boolean(user?.isVerifiedLawyer || dirLawyer?.isVerified);
+
+  // Enforce hierarchy: Team members CANNOT revoke or reject an already-approved lawyer! Only Super Admin can.
+  if (currentlyApproved && (action === 'revoke' || action === 'reject') && !isSuperAdmin) {
+    return res.status(403).json({
+      error: 'Hierarchy Restriction: Team members cannot undo or revoke an already-approved lawyer. Only the Super Admin (Srijen) can remove a mistaken approval.'
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  if (action === 'approve') {
+    if (user) {
+      user.isVerifiedLawyer = true;
+      (user as any).verificationStatus = 'approved';
+      (user as any).verifiedBy = normalizedActor;
+      (user as any).verifiedAt = nowIso;
+    }
+    if (dirLawyer) {
+      dirLawyer.isVerified = true;
+    }
+  } else if (action === 'reject' || action === 'revoke') {
+    if (user) {
+      user.isVerifiedLawyer = false;
+      (user as any).verificationStatus = action === 'revoke' ? 'pending' : 'rejected';
+      (user as any).verifiedBy = normalizedActor;
+      (user as any).verifiedAt = nowIso;
+    }
+    if (dirLawyer) {
+      dirLawyer.isVerified = false;
+    }
+  } else {
+    return res.status(400).json({ error: 'Invalid verification action.' });
+  }
+
+  res.json({
+    success: true,
+    message: action === 'approve'
+      ? 'Advocate manually verified and approved!'
+      : action === 'revoke'
+        ? 'Mistaken approval revoked by Admin. Advocate returned to pending status.'
+        : 'Advocate verification request rejected.'
+  });
+});
+
+app.post('/api/lawyers/submit-verification', apiLimiter, async (req, res) => {
+  const { lawyerId, barCouncilNumber, stateBarCouncil } = req.body;
+  const user = isSafeIdentifier(lawyerId) ? users[lawyerId] : undefined;
+
+  if (!user || user.role !== 'lawyer') {
+    return res.status(400).json({ error: 'User is not an advocate' });
+  }
+
+  // Strictly manual verification queue: set to pending so Admin / Team Members review it
+  (user as any).verificationStatus = 'pending';
+  user.isVerifiedLawyer = false;
+  if (barCouncilNumber) user.barCouncilNumber = String(barCouncilNumber).trim();
+  if (stateBarCouncil) user.stateBarCouncil = String(stateBarCouncil).trim();
+
+  const dirLawyer = lawyersDirectory.find(l => l.id === lawyerId);
+  if (dirLawyer) {
+    dirLawyer.isVerified = false;
+    if (barCouncilNumber) dirLawyer.barCouncilNumber = String(barCouncilNumber).trim();
+    if (stateBarCouncil) dirLawyer.stateBarCouncil = String(stateBarCouncil).trim();
+  }
+
+  res.json({ success: true, status: 'pending' });
+});
+
 // 3. Lawyers Directory & Search with Advanced Filtering and Grading Index
 app.get('/api/lawyers', apiLimiter, (req, res) => {
   const { query, specialization, verifiedOnly, court, maxFee, minExp, minRating, grade, sortBy } = req.query;
@@ -979,6 +1273,42 @@ app.get('/api/cases/search', apiLimiter, (req, res) => {
   }
 
   res.json({ cases: results, total: results.length });
+});
+
+// 5. Audio Transcription (Gemini 3.5 Transcribe)
+app.post('/api/transcribe', apiLimiter, async (req, res) => {
+  const { audioData, mimeType } = req.body;
+  
+  if (!audioData || !mimeType) {
+    return res.status(400).json({ error: 'Audio data and mime type are required' });
+  }
+
+  try {
+    const ai = getAIClient();
+    if (!ai) {
+      return res.status(500).json({ error: 'AI client not initialized' });
+    }
+
+    const interaction = await ai.interactions.create({
+      model: 'gemini-3.5-transcribe',
+      input: [
+        {
+          type: "audio",
+          data: audioData,
+          mime_type: mimeType,
+        },
+        {
+          type: "text",
+          text: "Transcribe this audio.",
+        },
+      ],
+    });
+
+    res.json({ text: interaction.output_text });
+  } catch (err) {
+    console.error('Transcription error:', err);
+    res.status(500).json({ error: 'Failed to transcribe audio' });
+  }
 });
 
 // -------------------------------------------------------------
@@ -2156,27 +2486,7 @@ async function startServer() {
     }
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`⚖️ JusticeBridge Full-Stack Server running on http://0.0.0.0:${PORT} (environment: ${isProduction ? 'production' : 'development'})`);
-  });
-
-  server.on('error', (err: any) => {
-    console.error('Server error:', err);
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use.`);
-    }
-  });
-
-  process.on('SIGTERM', () => {
-    server.close(() => {
-      process.exit(0);
-    });
-  });
-  process.on('SIGINT', () => {
-    server.close(() => {
-      process.exit(0);
-    });
-  });
+  console.log(`⚖️ JusticeBridge Full-Stack Server initialized on http://0.0.0.0:${PORT} (environment: ${isProduction ? 'production' : 'development'})`);
 }
 
 startServer();

@@ -52,8 +52,32 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
   const [minExp, setMinExp] = useState<string>('0');
   const [sortBy, setSortBy] = useState<string>('rating');
   const [gradeFilter, setGradeFilter] = useState<string>('All');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [activeLawyerDetail, setActiveLawyerDetail] = useState<LawyerProfile | null>(null);
+
+  // Load recent searches on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('recentLawyerSearches');
+    if (saved) setRecentSearches(JSON.parse(saved));
+  }, []);
+
+  const saveSearch = (query: string) => {
+    if (!query.trim()) return;
+    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 3);
+    setRecentSearches(updated);
+    localStorage.setItem('recentLawyerSearches', JSON.stringify(updated));
+  };
   const [modalTab, setModalTab] = useState<'profile' | 'grading'>('profile');
+
+  // Client-side filtering logic
+  const filteredLawyers = lawyers.filter((lawyer) => {
+    const matchesSearch = 
+      lawyer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lawyer.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lawyer.specialization.some(spec => spec.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+    return matchesSearch;
+  });
 
   // Review form state inside modal
   const [showReviewForm, setShowReviewForm] = useState<boolean>(false);
@@ -221,7 +245,7 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
       </div>
 
       {/* Search & Filter Controls */}
-      <div className="p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl mb-8">
+      <div className="sticky top-0 z-40 p-6 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl mb-8 backdrop-blur-sm">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           
           {/* Main Search Input */}
@@ -233,8 +257,23 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('searchPlaceholder')}
+              onBlur={(e) => saveSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-red-600 focus:ring-1 focus:ring-red-600 text-white placeholder-zinc-500 text-sm outline-none transition-colors"
             />
+            {recentSearches.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
+                <span>Recent:</span>
+                {recentSearches.map(s => (
+                  <button 
+                    key={s} 
+                    onClick={() => setSearchQuery(s)} 
+                    className="underline hover:text-white"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Court Filter Dropdown */}
@@ -327,7 +366,7 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
             </label>
 
             <span className="text-xs text-slate-500 font-mono">
-              ({lawyers.length} {t('advocatesCount')})
+              ({filteredLawyers.length} {t('advocatesCount')})
             </span>
           </div>
         </div>
@@ -339,7 +378,7 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
           <div className="w-10 h-10 border-4 border-red-700 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-400 text-sm">{t('queryingAdvocates')}</p>
         </div>
-      ) : lawyers.length === 0 ? (
+      ) : filteredLawyers.length === 0 ? (
         <div className="text-center py-16 p-8 rounded-2xl bg-zinc-900/60 border border-zinc-800">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-white mb-1">{t('noAdvocatesFound')}</h3>
@@ -361,7 +400,7 @@ export const LawyerDirectory: React.FC<LawyerDirectoryProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {lawyers.map((lawyer) => {
+          {filteredLawyers.map((lawyer) => {
             const gradeClass = getGradeColor(lawyer.grade);
 
             return (

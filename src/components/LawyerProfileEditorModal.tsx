@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, User, ShieldCheck, Briefcase, MapPin, Award, CheckCircle2 } from 'lucide-react';
+import { X, User, ShieldCheck, Briefcase, MapPin, Award, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { User as UserType } from '../types';
 import { getTranslation } from '../languages';
 import { logSecurityActivity } from '../services/securityLogger';
+import { verifyLawyer, LawyerVerificationResponse } from '../services/KarzaService';
 
 interface LawyerProfileEditorModalProps {
   currentUser: UserType;
@@ -31,6 +32,25 @@ export const LawyerProfileEditorModal: React.FC<LawyerProfileEditorModalProps> =
   const [consultationFee, setConsultationFee] = useState(String(currentUser?.consultationFee || 2500));
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [loading, setLoading] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<LawyerVerificationResponse | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setVerificationStatus(null);
+    try {
+      const response = await verifyLawyer({
+        barCouncilEnrollmentNumber: barCouncilNumber,
+        stateCode: stateBarCouncil, // Placeholder - usually requires mapping
+        yearOfEnrollment: '2020', // Placeholder
+      });
+      setVerificationStatus(response);
+    } catch (err) {
+      console.error('Verification failed', err);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,18 +157,24 @@ export const LawyerProfileEditorModal: React.FC<LawyerProfileEditorModalProps> =
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs font-mono outline-none focus:border-red-600"
               />
             </div>
-            <div>
-              <label className="text-xs text-slate-400 font-semibold block mb-1">Experience (Years)</label>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={yearsExperience}
-                onChange={(e) => setYearsExperience(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs outline-none focus:border-red-600"
-              />
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={verifying || !barCouncilNumber}
+                className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs text-slate-200 transition-colors"
+              >
+                {verifying ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Verify Identity'}
+              </button>
             </div>
           </div>
+
+          {verificationStatus && (
+            <div className={`p-3 rounded-xl flex items-center space-x-2 text-xs ${verificationStatus.isVerified ? 'bg-emerald-950/50 text-emerald-300' : 'bg-red-950/50 text-red-300'}`}>
+              {verificationStatus.isVerified ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              <span>{verificationStatus.isVerified ? 'Advocate Verified' : verificationStatus.error || 'Verification Failed'}</span>
+            </div>
+          )}
 
           <div>
             <label className="text-xs text-slate-400 font-semibold block mb-1">State Bar Council</label>

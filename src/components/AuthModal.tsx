@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { X, Scale, User as UserIcon, Briefcase, Mail, Phone, Lock, ShieldCheck, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { X, Scale, User as UserIcon, Briefcase, Mail, Phone, Lock, ShieldCheck, CheckCircle2, ArrowRight, Sparkles, KeyRound } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 import { User, UserRole } from '../types';
 import { getTranslation } from '../languages';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (user: User) => void;
+  onAuthSuccess: (user: User, openAdminTab?: boolean) => void;
   availablePersonas: User[];
   onSwitchPersona: (userId: string) => void;
   currentLanguage?: string;
+  initialTab?: 'register' | 'login' | 'staff';
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -19,9 +22,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   availablePersonas,
   onSwitchPersona,
   currentLanguage = 'en',
+  initialTab = 'register',
 }) => {
   const t = (key: Parameters<typeof getTranslation>[1]) => getTranslation(currentLanguage, key);
-  const [tab, setTab] = useState<'register' | 'login'>('register');
+  const [tab, setTab] = useState<'register' | 'login' | 'staff'>(initialTab);
   const [role, setRole] = useState<UserRole>('client');
 
   // Form state
@@ -37,7 +41,72 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Staff / Admin Email & Password state
+  const [staffEmail, setStaffEmail] = useState('srijenponugoti667@gmail.com');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [isSettingFirstPassword, setIsSettingFirstPassword] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleStaffAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const cleanEmail = staffEmail.trim().toLowerCase();
+    if (!cleanEmail || !staffPassword || staffPassword.length < 6) {
+      setError('Please enter a valid email and a password of at least 6 characters.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      let firebaseUser;
+      if (isSettingFirstPassword) {
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, staffPassword);
+        firebaseUser = cred.user;
+      } else {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, cleanEmail, staffPassword);
+          firebaseUser = cred.user;
+        } catch (signInErr: any) {
+          if (signInErr?.code === 'auth/user-not-found') {
+            setError('No password set yet for this email. Click "First time? Set Your Password" below to create your password.');
+            setLoading(false);
+            return;
+          }
+          throw signInErr;
+        }
+      }
+
+      const res = await fetch('/api/auth/staff-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          firebaseUid: firebaseUser.uid
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.user) {
+        setError(data.error || 'Unauthorized for Admin/Team portal.');
+        return;
+      }
+
+      onAuthSuccess(data.user, true);
+      onClose();
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        setError('Password is already set for this email! Switch to "Sign In with Password" and log in.');
+        setIsSettingFirstPassword(false);
+      } else if (err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
+        setError('Incorrect password (or if this is your very first time, click "First time? Set Your Password" below).');
+      } else {
+        setError(err?.message || 'Authentication failed. Please check your credentials.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,10 +179,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2 gap-2">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2 gap-2 overflow-x-auto">
           <button
-            onClick={() => setTab('register')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+            onClick={() => { setTab('register'); setError(null); }}
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               tab === 'register'
                 ? 'border-slate-900 text-slate-900'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -122,8 +191,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             Register New Account
           </button>
           <button
-            onClick={() => setTab('login')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+            onClick={() => { setTab('login'); setError(null); }}
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               tab === 'login'
                 ? 'border-slate-900 text-slate-900'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -141,7 +210,87 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {tab === 'register' ? (
+          {tab === 'staff' ? (
+            <form onSubmit={handleStaffAuth} className="space-y-4">
+              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-xs">
+                <div className="flex items-center space-x-2 text-red-900 font-extrabold mb-1">
+                  <ShieldCheck className="w-4 h-4 text-red-700" />
+                  <span>Password-Protected Verification Team Portal</span>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Only <strong>Founder/Admin (srijenponugoti667@gmail.com)</strong> and authorized <strong>Team Members</strong> can log in here with their password to manually verify lawyers.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+                <span className="font-semibold text-slate-700">
+                  {isSettingFirstPassword ? 'Mode: Set First-Time Password' : 'Mode: Sign In with Password'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSettingFirstPassword(!isSettingFirstPassword);
+                    setError(null);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-red-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  {isSettingFirstPassword ? 'Already have a password? Sign In' : 'First time? Set Your Password'}
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-700 font-semibold block mb-1">
+                  Admin or Team Member Email
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                  <input
+                    type="email"
+                    required
+                    value={staffEmail}
+                    onChange={(e) => setStaffEmail(e.target.value)}
+                    placeholder="srijenponugoti667@gmail.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-red-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-700 font-semibold block mb-1">
+                  {isSettingFirstPassword ? 'Create Your Secret Password (min 6 chars)' : 'Enter Your Password'}
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={staffPassword}
+                    onChange={(e) => setStaffPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-red-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shadow-sm flex items-center justify-center space-x-2 active:scale-95 transition-all cursor-pointer"
+              >
+                {loading ? (
+                  <span>Verifying Credentials...</span>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4" />
+                    <span>
+                      {isSettingFirstPassword ? 'Save Password & Open Admin Dashboard' : 'Login & Open Admin Dashboard'}
+                    </span>
+                  </>
+                )}
+              </button>
+            </form>
+          ) : tab === 'register' ? (
             <form onSubmit={handleRegister} className="space-y-4">
               
               {/* Free Trial / Partner Access Highlight Banner */}

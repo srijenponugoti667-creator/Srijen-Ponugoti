@@ -1,5 +1,5 @@
 // JusticeBridge Standalone Service Worker for PWABuilder & Mobile PWA
-const CACHE_NAME = 'justicebridge-pwa-v2';
+const CACHE_NAME = 'justicebridge-pwa-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

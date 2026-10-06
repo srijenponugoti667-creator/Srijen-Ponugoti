@@ -246,21 +246,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </p>
         </section>
 
-        {/* Trust & Credibility Stats */}
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6" aria-label="Trust and Credibility Statistics">
-          {[
-            { label: 'Cases Handled', value: '50,000+', icon: FileText },
-            { label: 'Active Lawyers', value: '2,500+', icon: Briefcase },
-            { label: 'Avg. Delay Reduction', value: '45%', icon: Clock },
-          ].map((stat, i) => (
-            <article key={i} className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm text-center">
-              <stat.icon className="w-10 h-10 text-red-700 mx-auto mb-4" />
-              <p className="text-4xl font-extrabold text-slate-900 mb-2">{stat.value}</p>
-              <p className="text-sm font-semibold text-slate-600 uppercase tracking-wide">{stat.label}</p>
-            </article>
-          ))}
-        </section>
-
       </div>
     </section>
   );

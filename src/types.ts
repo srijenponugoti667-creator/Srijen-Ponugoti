@@ -1,4 +1,4 @@
-export type UserRole = 'client' | 'lawyer' | 'admin';
+export type UserRole = 'client' | 'lawyer' | 'admin' | 'team_member';
 
 export interface CyberComplaint {
   id: string;

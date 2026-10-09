@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Upload } from 'lucide-react';
+import { X, AlertTriangle, Upload, ShieldCheck } from 'lucide-react';
 import { User, CyberComplaint } from '../types';
 import { db, storage } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  computeFileBytesSha256,
+  validateEvidenceFile,
+  ALLOWED_INCIDENT_EVIDENCE_MIMES,
+  MAX_INCIDENT_EVIDENCE_BYTES,
+} from '../services/evidenceHasher';
+import { logSecurityActivity } from '../services/securityLogger';
 
 interface ReportIncidentModalProps {
   currentUser: User;
@@ -23,9 +30,44 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
   const [abuseType, setAbuseType] = useState<CyberComplaint['abuseType']>('Harassment');
   const [impactDescription, setImpactDescription] = useState<string>('');
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceSha256, setEvidenceSha256] = useState<string>('');
+  const [evidenceSizeFormatted, setEvidenceSizeFormatted] = useState<string>('');
+  const [fileError, setFileError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   if (!isOpen) return null;
+
+  const handleEvidenceChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setFileError('');
+    setEvidenceSha256('');
+    setEvidenceSizeFormatted('');
+
+    if (!file) {
+      setEvidenceFile(null);
+      return;
+    }
+
+    const validation = validateEvidenceFile(file, {
+      maxBytes: MAX_INCIDENT_EVIDENCE_BYTES,
+      allowedMimes: ALLOWED_INCIDENT_EVIDENCE_MIMES,
+    });
+
+    if (!validation.valid) {
+      setEvidenceFile(null);
+      setFileError(validation.error || 'Invalid evidence file.');
+      return;
+    }
+
+    setEvidenceFile(file);
+    setEvidenceSizeFormatted(validation.formattedSize);
+    try {
+      const digest = await computeFileBytesSha256(file);
+      setEvidenceSha256(digest);
+    } catch (err) {
+      console.error('Failed to hash evidence file:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +77,17 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
 
     try {
       let evidenceUrl = '';
+      let computedDigest = evidenceSha256;
       if (evidenceFile) {
+        if (!computedDigest) {
+          computedDigest = await computeFileBytesSha256(evidenceFile);
+        }
         const storageRef = ref(storage, `evidence/${currentUser.id}/${Date.now()}_${evidenceFile.name}`);
         const snapshot = await uploadBytes(storageRef, evidenceFile);
         evidenceUrl = await getDownloadURL(snapshot.ref);
       }
 
+      const createdAt = new Date().toISOString();
       const docRef = await addDoc(collection(db, 'cyberComplaints'), {
         clientId: currentUser.id,
         platformName,
@@ -48,8 +95,18 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
         abuseType,
         impactDescription,
         evidenceUrl,
-        createdAt: new Date().toISOString(),
+        evidenceSha256: computedDigest || null,
+        evidenceByteSize: evidenceFile ? evidenceFile.size : null,
+        status: 'Pending',
+        createdAt,
       });
+
+      if (computedDigest) {
+        await logSecurityActivity(
+          'EVIDENCE_UPLOAD',
+          `Cybercrime report ${docRef.id} evidence hashed (raw bytes): ${computedDigest}`
+        );
+      }
 
       onReportFiled({
         id: docRef.id,
@@ -59,7 +116,10 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
         abuseType,
         impactDescription,
         evidenceUrl,
-        createdAt: new Date().toISOString(),
+        evidenceSha256: computedDigest || undefined,
+        evidenceByteSize: evidenceFile ? evidenceFile.size : undefined,
+        status: 'Pending',
+        createdAt,
       });
       onClose();
     } catch (err) {
@@ -111,18 +171,30 @@ export const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
           </div>
           
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">Evidence (Screenshots or Videos)</label>
+            <label className="text-slate-300 font-semibold block mb-1">Evidence (Screenshots, PDFs, or Videos • Max 25 MB)</label>
             <div className="w-full flex items-center justify-center px-6 pt-5 pb-6 border-2 border-zinc-800 border-dashed rounded-xl bg-zinc-900 hover:border-amber-600 transition-colors">
               <div className="space-y-1 text-center">
                 <Upload className="mx-auto h-8 w-8 text-slate-400" />
-                <div className="flex text-sm text-slate-400">
+                <div className="flex justify-center text-sm text-slate-400">
                   <label htmlFor="evidence-upload" className="relative cursor-pointer bg-zinc-900 rounded-md font-medium text-amber-400 hover:text-amber-300">
-                    <span>{evidenceFile ? evidenceFile.name : 'Upload File'}</span>
-                    <input id="evidence-upload" name="evidence-upload" type="file" accept="image/*,video/*" className="sr-only" onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)} />
+                    <span>{evidenceFile ? `${evidenceFile.name} (${evidenceSizeFormatted})` : 'Upload File'}</span>
+                    <input id="evidence-upload" name="evidence-upload" type="file" accept="image/*,video/*,application/pdf" className="sr-only" onChange={handleEvidenceChange} />
                   </label>
                 </div>
               </div>
             </div>
+            {evidenceSha256 && (
+              <div className="mt-2 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 flex items-start gap-2 text-[10px]">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <span className="text-emerald-300 font-semibold block">Raw File Bytes SHA-256 Computed (Sec 63 BSA / 65B IEA)</span>
+                  <span className="font-mono text-slate-300 break-all">{evidenceSha256}</span>
+                </div>
+              </div>
+            )}
+            {fileError && (
+              <p className="mt-1.5 text-[11px] text-red-400 font-medium">{fileError}</p>
+            )}
           </div>
 
           <button type="submit" disabled={loading} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-700 via-amber-800 to-amber-900 hover:from-amber-600 text-white font-bold text-xs shadow-xl border border-amber-600/40 transition-all active:scale-95">

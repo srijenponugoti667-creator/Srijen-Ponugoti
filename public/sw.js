@@ -36,14 +36,33 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'PURGE_SENSITIVE_CACHE') {
+    event.waitUntil(
+      caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n))))
+    );
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Network-first with Cache fallback strategy
+  // Shared-Device Privacy Enforcement: NEVER cache /api/* routes, Auth tokens, or Firestore/Storage payloads
+  const reqUrl = new URL(event.request.url);
+  if (
+    reqUrl.pathname.startsWith('/api/') ||
+    reqUrl.hostname.includes('firestore.googleapis.com') ||
+    reqUrl.hostname.includes('identitytoolkit.googleapis.com') ||
+    reqUrl.hostname.includes('firebasestorage.googleapis.com')
+  ) {
+    return;
+  }
+
+  // Network-first with Cache fallback strategy exclusively for static shell assets
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone and cache valid responses
+        // Clone and cache valid static asset responses only
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {

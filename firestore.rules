@@ -9,9 +9,63 @@ service cloud.firestore {
     function isTeamMember() { return isSignedIn() && getUserData().role == 'team_member'; }
     function isAuthorizedForVerification() { return isAdmin() || isTeamMember(); }
 
-    // Verification Requests
+    // 1. Users Collection (Strict Anti-Privilege Escalation & Bar Verification Guard)
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isAuthorizedForVerification() ||
+        resource.data.role == 'lawyer'
+      );
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.role in ['client', 'lawyer'] &&
+        request.resource.data.role != 'admin' &&
+        (!('verified' in request.resource.data) || request.resource.data.verified == false) &&
+        (!('isVerifiedLawyer' in request.resource.data) || request.resource.data.isVerifiedLawyer == false);
+      allow update: if isSignedIn() && (
+        isAuthorizedForVerification() ||
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role &&
+          (!('verified' in request.resource.data) || request.resource.data.verified == resource.data.verified) &&
+          (!('isVerifiedLawyer' in request.resource.data) || request.resource.data.isVerifiedLawyer == resource.data.isVerifiedLawyer)
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. Legal Cases Collection (Strict Client & Assigned Advocate Isolation)
+    match /cases/{caseId} {
+      allow read: if isSignedIn() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.assignedLawyerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() &&
+        request.resource.data.clientId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.clientId == request.auth.uid ||
+        resource.data.assignedLawyerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. Cybercrime Incident Reports (PII & Raw-Byte Evidence Hash Protection)
+    match /cyberComplaints/{complaintId} {
+      allow read: if isSignedIn() && (
+        resource.data.clientId == request.auth.uid ||
+        isAuthorizedForVerification()
+      );
+      allow create: if isSignedIn() &&
+        request.resource.data.clientId == request.auth.uid;
+      allow update: if isAuthorizedForVerification();
+      allow delete: if isAdmin();
+    }
+
+    // 4. Bar Council Verification Requests
     match /verificationRequests/{requestId} {
-      allow read: if isAuthorizedForVerification();
+      allow read: if isAuthorizedForVerification() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn(); // Advocates can submit
       allow update: if isAuthorizedForVerification() && (
         isAdmin() || 
@@ -19,9 +73,23 @@ service cloud.firestore {
          request.resource.data.status in ['approved', 'rejected'] && 
          resource.data.status in ['pending', 'rejected'])
       );
+      allow delete: if isAdmin();
     }
 
-    // Default Deny
+    // 5. Immutable Chain-of-Custody & Security Audit Logs
+    match /securityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Default Deny Fallback
     match /{document=**} {
       allow read, write: if false;
     }

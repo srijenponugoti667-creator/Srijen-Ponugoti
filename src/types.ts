@@ -7,8 +7,11 @@ export interface CyberComplaint {
   targetUrl: string;
   abuseType: 'Harassment' | 'Hate Speech' | 'Defamation' | 'Impersonation' | 'Other';
   impactDescription: string;
+  evidenceUrl?: string;
+  evidenceSha256?: string;
+  evidenceByteSize?: number;
   createdAt: string;
-  status: 'Pending' | 'Reviewing' | 'ActionTaken' | 'Closed';
+  status?: 'Pending' | 'Reviewing' | 'ActionTaken' | 'Closed';
 }
 
 export interface User {
@@ -58,6 +61,11 @@ export interface CaseDocument {
   isRestricted: boolean; // Only verified lawyers can view
   fileUrl?: string;
   documentHash: string;
+  hashSource?: 'raw_file_bytes' | 'canonical_payload';
+  byteLength?: number;
+  mimeType?: string;
+  uploadedById?: string;
+  uploadedTimestampIso?: string;
   pageCount: number;
   summary?: string;
 }

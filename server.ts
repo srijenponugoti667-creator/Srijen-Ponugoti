@@ -1612,9 +1612,12 @@ app.post('/api/cases/file', apiLimiter, (req, res) => {
         fileSize: '3.2 MB',
         uploadedAt: new Date().toISOString().split('T')[0],
         uploadedBy: user.name,
+        uploadedById: user.id,
+        uploadedTimestampIso: new Date().toISOString(),
         fileCategory: 'Petition',
         isRestricted: true,
-        documentHash: `sha256:${Math.random().toString(36).substring(2)}${Date.now()}`,
+        documentHash: `sha256:${crypto.createHash('sha256').update(`${newCaseId}|${cleanTitle}|${cleanSummary}|${user.id}`).digest('hex')}`,
+        hashSource: 'canonical_payload',
         pageCount: 24,
         summary: 'Digitally signed e-filing memorandum with urgent relief request.'
       }
@@ -1629,11 +1632,22 @@ app.post('/api/cases/file', apiLimiter, (req, res) => {
   });
 });
 
-// Upload document to a case
+// Upload document to a case (Supports raw file-byte SHA-256 digest or server-computed SHA-256)
 app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
   const { id } = req.params;
   const user = getCurrentUser(req);
-  const { title, fileName, fileCategory, summary } = req.body;
+  const {
+    title,
+    fileName,
+    fileCategory,
+    summary,
+    clientFileHash,
+    fileContentBase64,
+    hashSource,
+    fileSize,
+    byteLength,
+    mimeType
+  } = req.body;
 
   const caseItem = casesStore.find(c => c.id === id);
   if (!caseItem) {
@@ -1642,29 +1656,150 @@ app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
 
   // Security check: Client can only upload to their own case, lawyer only if assigned or verified
   if (user.role === 'client' && caseItem.clientId !== user.id) {
-    return res.status(403).json({ error: 'Unauthorized: Client isolation enforced.' });
+    return res.status(403).json({
+      error: 'Unauthorized: Client isolation enforced.',
+      securityCode: 'SEC_CLIENT_ISOLATION_VIOLATION'
+    });
   }
   if (user.role === 'lawyer' && caseItem.assignedLawyerId !== user.id && !user.isVerifiedLawyer) {
-    return res.status(403).json({ error: 'Unauthorized: Advocate assignment or Bar verification required to append case documents.' });
+    return res.status(403).json({
+      error: 'Unauthorized: Advocate assignment or Bar verification required to append case documents.',
+      securityCode: 'SEC_UNVERIFIED_LAWYER_UPLOAD_BLOCKED'
+    });
   }
 
+  // Validate MIME type if supplied
+  const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+  if (mimeType && typeof mimeType === 'string' && !allowedMimes.includes(mimeType)) {
+    return res.status(400).json({
+      error: `Unsupported file MIME type (${mimeType}). Allowed: ${allowedMimes.join(', ')}`,
+      securityCode: 'SEC_INVALID_DOCUMENT_MIME'
+    });
+  }
+
+  // Validate max byte size (10 MB) if supplied
+  if (byteLength !== undefined && (Number(byteLength) <= 0 || Number(byteLength) > 10 * 1024 * 1024)) {
+    return res.status(400).json({
+      error: 'Invalid document byte length: must be > 0 B and <= 10 MB.',
+      securityCode: 'SEC_INVALID_DOCUMENT_SIZE'
+    });
+  }
+
+  // Compute or validate real FIPS 180-4 SHA-256 digest
+  const sha256Regex = /^sha256:[a-f0-9]{64}$/i;
+  let verifiedDocumentHash: string;
+  let resolvedHashSource: 'raw_file_bytes' | 'canonical_payload' = 'canonical_payload';
+  let resolvedByteLength: number | undefined = byteLength ? Number(byteLength) : undefined;
+
+  if (typeof fileContentBase64 === 'string' && fileContentBase64.length > 0) {
+    const rawBuffer = Buffer.from(fileContentBase64, 'base64');
+    if (rawBuffer.byteLength > 10 * 1024 * 1024) {
+      return res.status(400).json({
+        error: 'Raw file payload exceeds 10 MB limit.',
+        securityCode: 'SEC_PAYLOAD_TOO_LARGE'
+      });
+    }
+    verifiedDocumentHash = `sha256:${crypto.createHash('sha256').update(rawBuffer).digest('hex')}`;
+    resolvedHashSource = 'raw_file_bytes';
+    resolvedByteLength = rawBuffer.byteLength;
+  } else if (typeof clientFileHash === 'string' && sha256Regex.test(clientFileHash.trim())) {
+    verifiedDocumentHash = clientFileHash.trim().toLowerCase();
+    resolvedHashSource = hashSource === 'raw_file_bytes' ? 'raw_file_bytes' : 'canonical_payload';
+  } else {
+    const canonicalPayload = `${id}|${title || 'Supplementary Court Filing'}|${fileName || 'Court_Document_Upload.pdf'}|${fileCategory || 'Evidence'}|${summary || ''}|${user.id}`;
+    verifiedDocumentHash = `sha256:${crypto.createHash('sha256').update(canonicalPayload, 'utf8').digest('hex')}`;
+    resolvedHashSource = 'canonical_payload';
+  }
+
+  const uploadedTimestampIso = new Date().toISOString();
   const newDoc: CaseDocument = {
-    id: `doc_${Date.now()}`,
-    title: title || 'Supplementary Court Filing',
-    fileName: fileName || 'Court_Document_Upload.pdf',
-    fileType: 'pdf',
-    fileSize: `${(Math.random() * 8 + 1.2).toFixed(1)} MB`,
-    uploadedAt: new Date().toISOString().split('T')[0],
+    id: `doc_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`,
+    title: sanitizePromptInput(title || 'Supplementary Court Filing', 150),
+    fileName: sanitizePromptInput(fileName || 'Court_Document_Upload.pdf', 120),
+    fileType: (mimeType && mimeType.startsWith('image/')) ? 'image' : 'pdf',
+    fileSize: typeof fileSize === 'string' && fileSize.trim() ? fileSize.trim() : (resolvedByteLength ? `${(resolvedByteLength / 1024).toFixed(1)} KB` : '1.4 MB'),
+    uploadedAt: uploadedTimestampIso.split('T')[0],
     uploadedBy: user.name,
+    uploadedById: user.id,
+    uploadedTimestampIso,
     fileCategory: fileCategory || 'Evidence',
     isRestricted: true,
-    documentHash: `sha256:${Math.random().toString(36).substring(2)}${Date.now()}`,
-    pageCount: Math.floor(Math.random() * 30 + 4),
-    summary: summary || 'Supplementary verified legal document added to judicial vault.'
+    documentHash: verifiedDocumentHash,
+    hashSource: resolvedHashSource,
+    byteLength: resolvedByteLength,
+    mimeType: mimeType || 'application/pdf',
+    pageCount: Math.floor(Math.random() * 20 + 4),
+    summary: sanitizePromptInput(summary || 'Supplementary verified legal document added to judicial vault.', 500)
   };
 
   caseItem.documents.push(newDoc);
   res.status(201).json({ success: true, document: newDoc });
+});
+
+// Verify SHA-256 Document Hash Integrity (Section 63 BSA 2023 / Section 65B IEA Chain-of-Custody Verification)
+app.post('/api/cases/:id/documents/:docId/verify-hash', apiLimiter, (req, res) => {
+  const { id, docId } = req.params;
+  const user = getCurrentUser(req);
+  const { candidateHash, fileContentBase64 } = req.body;
+
+  const caseItem = casesStore.find(c => c.id === id);
+  if (!caseItem) {
+    return res.status(404).json({ error: 'Case matter not found.' });
+  }
+
+  // Enforce ownership / verified advocate access
+  if (user.role === 'client' && caseItem.clientId !== user.id) {
+    return res.status(403).json({
+      error: 'Unauthorized: Client isolation enforced.',
+      securityCode: 'SEC_CLIENT_ISOLATION_VIOLATION'
+    });
+  }
+  if (user.role === 'lawyer' && caseItem.assignedLawyerId !== user.id && !user.isVerifiedLawyer) {
+    return res.status(403).json({
+      error: 'Unauthorized: Bar verification required.',
+      securityCode: 'SEC_UNVERIFIED_LAWYER_BLOCKED'
+    });
+  }
+
+  const docItem = caseItem.documents.find(d => d.id === docId);
+  if (!docItem) {
+    return res.status(404).json({ error: 'Document not found in case vault.' });
+  }
+
+  let computedCandidateHash = typeof candidateHash === 'string' ? candidateHash.trim().toLowerCase() : '';
+  if (typeof fileContentBase64 === 'string' && fileContentBase64.length > 0) {
+    const rawBytes = Buffer.from(fileContentBase64, 'base64');
+    computedCandidateHash = `sha256:${crypto.createHash('sha256').update(rawBytes).digest('hex')}`;
+  }
+
+  const storedHash = (docItem.documentHash || '').toLowerCase();
+  const isValidFormat = /^sha256:[a-f0-9]{64}$/.test(storedHash);
+  const matches = Boolean(isValidFormat && computedCandidateHash && computedCandidateHash === storedHash);
+
+  if (!matches) {
+    return res.status(400).json({
+      verified: false,
+      tamperDetected: true,
+      error: 'Cryptographic SHA-256 mismatch: Candidate file bytes do not match stored chain-of-custody digest.',
+      securityCode: 'SEC_DOCUMENT_HASH_TAMPER_DETECTED',
+      storedHash: docItem.documentHash,
+      candidateHash: computedCandidateHash || null,
+      hashSource: docItem.hashSource || 'canonical_payload',
+      algorithm: 'SHA-256 (FIPS 180-4)'
+    });
+  }
+
+  return res.json({
+    verified: true,
+    tamperDetected: false,
+    storedHash: docItem.documentHash,
+    candidateHash: computedCandidateHash,
+    hashSource: docItem.hashSource || 'canonical_payload',
+    uploadedBy: docItem.uploadedBy,
+    uploadedTimestampIso: docItem.uploadedTimestampIso || docItem.uploadedAt,
+    algorithm: 'SHA-256 (FIPS 180-4)',
+    statutoryCompliance: 'Section 63 Bharatiya Sakshya Adhiniyam (BSA), 2023 / Section 65B IEA'
+  });
 });
 
 // -------------------------------------------------------------
@@ -2437,9 +2572,12 @@ app.post('/api/ai/voice-file-case', apiLimiter, async (req, res) => {
           fileSize: '2.8 MB',
           uploadedAt: new Date().toISOString().split('T')[0],
           uploadedBy: `${user.name} (AI Voice Assistant)`,
+          uploadedById: user.id,
+          uploadedTimestampIso: new Date().toISOString(),
           fileCategory: 'Petition',
           isRestricted: true,
-          documentHash: `sha256:voice_${Math.random().toString(36).substring(2)}${Date.now()}`,
+          documentHash: `sha256:${crypto.createHash('sha256').update(`${newCaseId}|${extractedData.title}|${cleanTranscript}|${user.id}`).digest('hex')}`,
+          hashSource: 'canonical_payload',
           pageCount: 18,
           summary: `Official court petition brief generated from citizen voice narrative. Relief sought: ${extractedData.reliefSought}`
         }

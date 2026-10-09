@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -6,7 +7,7 @@ import Razorpay from 'razorpay';
 import rateLimit from 'express-rate-limit';
 import { WebSocketServer } from 'ws';
 import { GoogleGenAI } from '@google/genai';
-import { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.js';
+import type { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.ts';
 
 const app = express();
 
@@ -15,9 +16,19 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Detect production environment:
-// 1. Explicit NODE_ENV === 'production'
-// 2. Or running the compiled bundle dist/server.cjs
-const isProduction = process.env.NODE_ENV === 'production' || (typeof __filename !== 'undefined' && __filename.includes('dist'));
+// 1. Explicit NODE_ENV === 'production' or npm start
+// 2. Running the compiled bundle dist/server.cjs
+// 3. Running directly via `node server.ts` (not via `tsx`) after `dist/index.html` has been built
+const isRunningViaTsx =
+  process.execArgv.some((arg) => arg.includes('tsx')) ||
+  Boolean(process.env._ && process.env._.includes('tsx'));
+const isProduction =
+  process.env.NODE_ENV === 'production' ||
+  process.env.npm_lifecycle_event === 'start' ||
+  (typeof __filename !== 'undefined' && __filename.includes('dist')) ||
+  (!isRunningViaTsx &&
+    process.env.npm_lifecycle_event !== 'dev' &&
+    fs.existsSync(path.resolve(process.cwd(), 'dist', 'index.html')));
 
 // Security Rate Limiter (Addresses CodeQL missing rate limiting alert)
 // Relax rate limiting significantly during non-production/development to avoid locking out the developer.
@@ -35,9 +46,7 @@ app.use(apiLimiter);
 // and routes all incoming traffic exclusively to port 3000.
 // PORT must strictly be 3000 in all environments to prevent EADDRINUSE collisions.
 const PORT = 3000;
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server });
 wss.on('connection', (ws) => {
@@ -2499,7 +2508,9 @@ async function startServer() {
     }
   }
 
-  console.log(`⚖️ JusticeBridge Full-Stack Server initialized on http://0.0.0.0:${PORT} (environment: ${isProduction ? 'production' : 'development'})`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`⚖️ JusticeBridge Full-Stack Server initialized on http://0.0.0.0:${PORT} (environment: ${isProduction ? 'production' : 'development'})`);
+  });
 }
 
 startServer();

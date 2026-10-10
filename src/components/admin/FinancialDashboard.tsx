@@ -7,6 +7,8 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 
+import { User } from '../../types';
+
 interface Subscription {
   id: string;
   amount: number;
@@ -14,7 +16,15 @@ interface Subscription {
   userId: string;
 }
 
-export const FinancialDashboard = ({ isAdmin, userId }: { isAdmin: boolean; userId: string }) => {
+interface FinancialDashboardProps {
+  isAdmin?: boolean;
+  userId?: string;
+  currentUser?: User;
+}
+
+export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ isAdmin, userId, currentUser }) => {
+  const effectiveIsAdmin = isAdmin ?? (currentUser?.role === 'admin' || currentUser?.role === 'team_member');
+  const effectiveUserId = userId ?? currentUser?.id ?? '';
   const [data, setData] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [newAmount, setNewAmount] = useState('');
@@ -23,8 +33,8 @@ export const FinancialDashboard = ({ isAdmin, userId }: { isAdmin: boolean; user
     setLoading(true);
     try {
       let q = query(collection(db, 'subscriptions'), orderBy('createdAt', 'asc'));
-      if (!isAdmin) {
-        q = query(q, where('userId', '==', userId));
+      if (!effectiveIsAdmin) {
+        q = query(q, where('userId', '==', effectiveUserId));
       }
       const snapshot = await getDocs(q);
       setData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subscription)));
@@ -37,14 +47,14 @@ export const FinancialDashboard = ({ isAdmin, userId }: { isAdmin: boolean; user
 
   useEffect(() => {
     fetchData();
-  }, [isAdmin, userId]);
+  }, [effectiveIsAdmin, effectiveUserId]);
 
   const addSubscription = async () => {
     if (!newAmount) return;
     await addDoc(collection(db, 'subscriptions'), {
       amount: Number(newAmount),
       createdAt: new Date().toISOString(),
-      userId: userId
+      userId: effectiveUserId
     });
     setNewAmount('');
     fetchData();

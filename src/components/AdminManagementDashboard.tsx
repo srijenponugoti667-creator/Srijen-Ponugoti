@@ -591,7 +591,11 @@ export const AdminManagementDashboard: React.FC<AdminManagementDashboardProps> =
             </div>
 
             {activeFilter === 'financial' ? (
-              <FinancialDashboard currentUser={staffUser!} />
+              <FinancialDashboard
+                isAdmin={true}
+                userId={staffUser?.id || ''}
+                currentUser={staffUser!}
+              />
             ) : activeFilter === 'subscriptions' ? (
               <SubscriptionManagement currentUser={staffUser!} />
             ) : displayedLawyers.length === 0 ? (

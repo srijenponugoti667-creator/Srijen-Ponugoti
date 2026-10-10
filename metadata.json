@@ -4,5 +4,10 @@
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  ],
+  "googlePlayStore": {
+    "contentRatingCertificate": "Pending",
+    "privacyPolicyUrl": "https://justicebridge.example.com/privacy-policy",
+    "supportEmail": "srijenponugoti667@gmail.com"
+  }
 }

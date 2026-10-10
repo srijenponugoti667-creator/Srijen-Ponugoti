@@ -3,6 +3,7 @@ import { collection, query, onSnapshot, doc, updateDoc, getDocs, where } from 'f
 import { db } from '../firebase';
 import { User } from '../types';
 import { ShieldCheck, UserPlus, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { assertValidFirestoreId } from '../utils/FirestoreValidation';
 
 export const AdminDashboard: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [requests, setRequests] = useState<any[]>([]);
@@ -27,6 +28,7 @@ export const AdminDashboard: React.FC<{ currentUser: User }> = ({ currentUser })
   }, []);
 
   const handleUpdateStatus = async (requestId: string, newStatus: 'approved' | 'rejected', currentStatus: string) => {
+    assertValidFirestoreId(requestId, 'verificationRequests');
     if (currentUser.role === 'team_member' && currentStatus === 'approved') {
       alert("Team members cannot undo an approved request.");
       return;

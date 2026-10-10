@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
+import { FinancialDashboard } from './admin/FinancialDashboard';
+import { SubscriptionManagement } from './admin/SubscriptionManagement';
 import {
   ShieldCheck,
   UserPlus,
@@ -73,7 +75,7 @@ export const AdminManagementDashboard: React.FC<AdminManagementDashboardProps> =
   const [newTeamName, setNewTeamName] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'pending' | 'approved' | 'all'>('pending');
+  const [activeFilter, setActiveFilter] = useState<'pending' | 'approved' | 'all' | 'financial' | 'subscriptions'>('pending');
 
   // Secondary Password Confirmation State for Sensitive Actions
   const [reauthPassword, setReauthPassword] = useState('');
@@ -555,6 +557,26 @@ export const AdminManagementDashboard: React.FC<AdminManagementDashboardProps> =
                 >
                   All ({lawyers.length})
                 </button>
+                <button
+                  onClick={() => setActiveFilter('financial')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition ${
+                    activeFilter === 'financial'
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Financial Dashboard
+                </button>
+                <button
+                  onClick={() => setActiveFilter('subscriptions')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition ${
+                    activeFilter === 'subscriptions'
+                      ? 'bg-indigo-700 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Subscription Management
+                </button>
               </div>
 
               <a
@@ -568,7 +590,11 @@ export const AdminManagementDashboard: React.FC<AdminManagementDashboardProps> =
               </a>
             </div>
 
-            {displayedLawyers.length === 0 ? (
+            {activeFilter === 'financial' ? (
+              <FinancialDashboard currentUser={staffUser!} />
+            ) : activeFilter === 'subscriptions' ? (
+              <SubscriptionManagement currentUser={staffUser!} />
+            ) : displayedLawyers.length === 0 ? (
               <div className="p-12 rounded-3xl bg-white border border-slate-200 text-center">
                 <Award className="w-10 h-10 text-slate-400 mx-auto mb-3" />
                 <h3 className="text-base font-bold text-slate-900">
@@ -661,6 +687,7 @@ export const AdminManagementDashboard: React.FC<AdminManagementDashboardProps> =
                 ))}
               </div>
             )}
+
           </div>
 
           {/* RIGHT COLUMN: TEAM ACCESS MANAGEMENT (UNLIMITED TEAM MEMBERS) */}

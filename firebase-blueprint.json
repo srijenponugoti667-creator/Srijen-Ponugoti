@@ -15,12 +15,63 @@
         "lastModifiedAt": { "type": "string" }
       },
       "required": ["id", "advocateId", "status"]
+    },
+    "AIAdviceReview": {
+      "title": "AI Advice Review",
+      "description": "Represents an AI-generated legal advice that requires advocate review.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "query": { "type": "string" },
+        "advice": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "reviewerId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "query", "advice", "status"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Immutable log entry for system actions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "resourcePath": { "type": "string" },
+        "payloadHash": { "type": "string" }
+      },
+      "required": ["userId", "action", "timestamp", "resourcePath"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Represents a Razorpay subscription.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "amount", "createdAt"]
     }
   },
   "firestore": {
     "verificationRequests/{requestId}": {
       "schema": "VerificationRequest",
       "description": "Collection of manual verification requests for advocates."
+    },
+    "audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of forensic audit log entries (append-only)."
+    },
+    "ai_advice_reviews/{reviewId}": {
+      "schema": "AIAdviceReview",
+      "description": "Collection of AI advice waiting for human advocate review."
+    },
+    "subscriptions/{subId}": {
+      "schema": "Subscription",
+      "description": "Collection of Razorpay subscriptions."
     }
   }
 }

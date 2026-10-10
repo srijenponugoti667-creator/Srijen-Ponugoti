@@ -89,6 +89,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // 6. AI Advice Reviews
+    match /ai_advice_reviews/{reviewId} {
+      allow read: if isAuthorizedForVerification() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAuthorizedForVerification();
+      allow delete: if isAdmin();
+    }
+
     // Default Deny Fallback
     match /{document=**} {
       allow read, write: if false;

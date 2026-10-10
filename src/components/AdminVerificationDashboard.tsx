@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ShieldCheck, X, CheckCircle2, Clock } from 'lucide-react';
 import { User } from '../types';
+import { assertValidFirestoreId } from '../utils/FirestoreValidation';
 
 export const AdminVerificationDashboard: React.FC<{currentUser: User}> = ({ currentUser }) => {
   const [pendingLawyers, setPendingLawyers] = useState<User[]>([]);
@@ -28,6 +29,7 @@ export const AdminVerificationDashboard: React.FC<{currentUser: User}> = ({ curr
   }, []);
 
   const handleAction = async (lawyerId: string, action: 'verified' | 'rejected', notes: string) => {
+    assertValidFirestoreId(lawyerId, 'users');
     try {
       // Update user status
       await updateDoc(doc(db, 'users', lawyerId), {

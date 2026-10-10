@@ -18,7 +18,8 @@
 9. [Operational Privacy (DPDP Act 2023), PWA Shared-Device Safety & Incident Response](#9-operational-privacy-dpdp-act-2023-pwa-shared-device-safety--incident-response)
 10. [Installation, Reproducible Local Setup & Troubleshooting](#10-installation-reproducible-local-setup--troubleshooting)
 11. [Step-by-Step End-to-End Demo Walkthrough](#11-step-by-step-end-to-end-demo-walkthrough)
-12. [Known Limitations & Future Production Roadmap](#12-known-limitations--future-production-roadmap)
+12. [Google Play Store Submission Readiness](#12-google-play-store-submission-readiness)
+13. [Known Limitations & Future Production Roadmap](#13-known-limitations--future-production-roadmap)
 
 ---
 
@@ -551,7 +552,20 @@ Use this 5-minute scenario to demonstrate all core workflows to evaluators, judg
 
 ---
 
-## 12. Known Limitations & Future Production Roadmap
+## 12. Google Play Store Submission Readiness
+
+To prepare JusticeBridge for production release on the Google Play Store, the following requirements have been established and tracked in `metadata.json`:
+
+*   **Content Rating:** Currently set to `Pending`. A complete questionnaire must be submitted via the Google Play Console during the app submission process to obtain the official IARC content rating certificate.
+*   **Privacy Policy:** A comprehensive privacy policy is hosted at `https://justicebridge.example.com/privacy-policy`. This must be kept updated to reflect any changes in data handling, particularly concerning the PWA's shared-device privacy features.
+*   **Support Information:** The official support contact is `srijenponugoti667@gmail.com`. This address is used for both Play Store listing support and for incident response communications as outlined in section 9.
+
+### Submission Roadmap
+1.  **Preparation:** Finalize all promotional assets, privacy policy, and support channels.
+2.  **Internal Testing:** Continue testing the PWA and Android Trusted Web Activity (TWA) bundle in the Play Console's internal testing track.
+3.  **App Submission:** Complete the Play Console store listing, content rating, and data safety forms, then submit the app for review.
+
+## 13. Known Limitations & Future Production Roadmap
 
 1. **Direct Government e-Courts Phase III API Integration:** Currently, `JB01-...` identifiers and initial scrutiny dates are internal platform records. Future integration with official High Court e-Filing APIs and NJDG webhooks will enable live government CNR synchronization.
 2. **Automated Bar Council Roll API Lookup:** Currently relies on format validation, Firebase Storage ID upload, and human verification officer approval (`verificationRequests`). Future partnerships with State Bar Councils will automate roll lookup.

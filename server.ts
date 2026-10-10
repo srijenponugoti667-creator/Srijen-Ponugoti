@@ -100,11 +100,46 @@ app.get(['/.well-known/assetlinks.json', '/assetlinks.json'], apiLimiter, (req, 
   res.sendFile(path.resolve(publicPath, '.well-known/assetlinks.json'));
 });
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    (req as any).rawBody = buf;
+  }
+}));
+
+import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import firebaseConfig from './firebase-applet-config.json';
+
+// Initialize Firebase Admin
+let firebaseApp;
+if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    if (serviceAccount && serviceAccount.project_id) {
+      firebaseApp = initializeApp({
+        credential: cert(serviceAccount)
+      });
+    } else {
+      throw new Error('Service account object missing project_id');
+    }
+  } catch (e) {
+    console.error('Failed to initialize Firebase with service account, falling back to applicationDefault:', e);
+    firebaseApp = initializeApp({
+      credential: applicationDefault()
+    });
+  }
+} else {
+  firebaseApp = initializeApp({
+    credential: applicationDefault()
+  });
+}
+const db = getFirestore(firebaseApp);
 
 // Razorpay Credentials Configuration (Strictly read from environment variables; no hardcoded secrets)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || '';
 
 let razorpayClient: Razorpay | null = null;
 function getRazorpayClient(): Razorpay | null {
@@ -118,6 +153,120 @@ function getRazorpayClient(): Razorpay | null {
     });
   }
   return razorpayClient;
+}
+
+// Subscription Endpoints
+app.post('/api/payments/create-subscription', apiLimiter, async (req, res) => {
+  const { planId, userId } = req.body;
+  const razorpay = getRazorpayClient();
+  if (!razorpay) return res.status(500).json({ error: 'Payment service not configured.' });
+
+  try {
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: planId,
+      customer_notify: 1,
+      quantity: 1,
+      total_count: 12,
+    });
+    
+    // Store in a local order map for now, or just send back
+    res.json(subscription);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create subscription.' });
+  }
+});
+
+app.get('/api/subscriptions', apiLimiter, async (req, res) => {
+  try {
+    const subs = await db.collection('subscriptions').get();
+    res.json(subs.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch subscriptions.' });
+  }
+});
+
+app.post('/api/subscriptions', apiLimiter, async (req, res) => {
+  try {
+    const subRef = await db.collection('subscriptions').add(req.body);
+    res.json({ id: subRef.id, ...req.body });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create subscription.' });
+  }
+});
+
+app.put('/api/subscriptions/:id', apiLimiter, async (req, res) => {
+  try {
+    await db.collection('subscriptions').doc(req.params.id).update(req.body);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update subscription.' });
+  }
+});
+
+app.delete('/api/subscriptions/:id', apiLimiter, async (req, res) => {
+  try {
+    await db.collection('subscriptions').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete subscription.' });
+  }
+});
+
+app.post('/api/payments/webhook', apiLimiter, async (req, res) => {
+  const secret = RAZORPAY_WEBHOOK_SECRET;
+  const signature = req.headers['x-razorpay-signature'];
+  const rawBody = (req as any).rawBody;
+  
+  if (!secret || !signature || typeof signature !== 'string' || !rawBody) {
+    return res.status(400).send('Invalid request');
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex');
+
+  if (expectedSignature === signature) {
+    const event = req.body.event;
+    try {
+      if (event === 'subscription.charged') {
+        const userId = req.body.payload.subscription.entity.notes.userId;
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({ membershipActive: true, nextBillingDate: new Date().toISOString() });
+      } else if (event === 'subscription.cancelled') {
+        const userId = req.body.payload.subscription.entity.notes.userId;
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({ membershipActive: false });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+    res.status(200).send('OK');
+  } else {
+    res.status(400).send('Invalid signature');
+  }
+});
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: 'admin' // In server-side admin operations, we are always admin
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
 }
 
 // Initialize Gemini API client lazily

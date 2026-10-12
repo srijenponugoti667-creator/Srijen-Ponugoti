@@ -10,11 +10,45 @@
  * 6. Deployment Readiness, Health Probes & PWA Shared-Device Cache Isolation
  */
 
+import { spawn, execSync, ChildProcess } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
+let spawnedServer: ChildProcess | null = null;
+
+async function ensureServerRunning(): Promise<void> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/health`);
+    if (res.ok) return;
+  } catch {
+    // Server is not running yet; spawn it for CI test execution
+  }
+
+  console.log('🚀 Starting JusticeBridge server for CI verification...');
+  spawnedServer = spawn('npx', ['tsx', 'server.ts'], {
+    cwd: process.cwd(),
+    env: { ...process.env, NODE_ENV: 'production', PORT: '3000' },
+    stdio: 'ignore',
+  });
+
+  const maxWaitMs = 20000;
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/health`);
+      if (res.ok) {
+        console.log('✅ JusticeBridge server online at ' + BASE_URL);
+        return;
+      }
+    } catch {
+      // Wait and retry
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error('Timed out waiting for server to start on ' + BASE_URL);
+}
 
 interface TestResult {
   id: string;
@@ -81,6 +115,8 @@ async function main() {
   console.log('⚖️  JUSTICEBRIDGE AUTOMATED VERIFICATION SUITE');
   console.log(`Target Runtime: ${BASE_URL} | Node: ${process.version}`);
   console.log('======================================================================\n');
+
+  await ensureServerRunning();
 
   let clientAToken = '';
   let clientAId = '';
@@ -722,6 +758,9 @@ async function main() {
     async () => {
       const indexHtml = path.resolve(process.cwd(), 'dist/index.html');
       const serverCjs = path.resolve(process.cwd(), 'dist/server.cjs');
+      if (!fs.existsSync(indexHtml) || !fs.existsSync(serverCjs)) {
+        execSync('npm run build', { stdio: 'inherit' });
+      }
       assert(fs.existsSync(indexHtml), 'dist/index.html missing');
       assert(fs.existsSync(serverCjs), 'dist/server.cjs missing');
       const sizeKb = Math.round(fs.statSync(serverCjs).size / 1024);
@@ -736,12 +775,20 @@ async function main() {
   console.log(`📊 TEST SUITE SUMMARY: ${passedCount}/${results.length} PASSED (${failedCount} FAILED)`);
   console.log('======================================================================');
 
+  if (spawnedServer) {
+    spawnedServer.kill('SIGTERM');
+  }
+
   if (failedCount > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 main().catch((err) => {
+  if (spawnedServer) {
+    spawnedServer.kill('SIGTERM');
+  }
   console.error('Fatal test runner error:', err);
   process.exit(1);
 });

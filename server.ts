@@ -7,6 +7,9 @@ import Razorpay from 'razorpay';
 import rateLimit from 'express-rate-limit';
 import { WebSocketServer } from 'ws';
 import { GoogleGenAI } from '@google/genai';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import type { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.ts';
 
 const app = express();
@@ -106,10 +109,10 @@ app.use(express.json({
   }
 }));
 
-import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import firebaseConfig from './firebase-applet-config.json';
+const firebaseConfigPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+const firebaseConfig = fs.existsSync(firebaseConfigPath)
+  ? JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf-8'))
+  : { projectId: 'zealous-pod-b09p9', firestoreDatabaseId: '(default)' };
 
 // Initialize Firebase Admin
 let firebaseApp;
@@ -118,23 +121,26 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
     if (serviceAccount && serviceAccount.project_id) {
       firebaseApp = initializeApp({
-        credential: cert(serviceAccount)
+        credential: cert(serviceAccount),
+        projectId: serviceAccount.project_id
       });
     } else {
       throw new Error('Service account object missing project_id');
     }
   } catch (e) {
-    console.error('Failed to initialize Firebase with service account, falling back to applicationDefault:', e);
+    console.error('Failed to initialize Firebase with service account, falling back to default credentials:', e);
     firebaseApp = initializeApp({
-      credential: applicationDefault()
+      projectId: firebaseConfig.projectId
     });
   }
 } else {
   firebaseApp = initializeApp({
-    credential: applicationDefault()
+    projectId: firebaseConfig.projectId
   });
 }
-const db = getFirestore(firebaseApp);
+const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(firebaseApp);
 
 // Razorpay Credentials Configuration (Strictly read from environment variables; no hardcoded secrets)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';

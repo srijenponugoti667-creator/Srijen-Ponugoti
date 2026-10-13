@@ -260,7 +260,7 @@ export const AdvocateGrading: React.FC<AdvocateGradingProps> = ({
                         <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
                           {lawyer.name}
                           {lawyer.isVerified && (
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" title="BCI Verified" />
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                           )}
                         </h4>
                         <p className="text-[11px] text-slate-400 line-clamp-1">{lawyer.stateBarCouncil}</p>

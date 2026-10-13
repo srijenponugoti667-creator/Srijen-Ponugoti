@@ -160,7 +160,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <button onClick={onLegalDocsClick} className="hover:text-red-700 transition-colors">Legal Docs</button>
             )}
             <button onClick={onMyCasesClick} className="hover:text-red-700 transition-colors">My Cases</button>
-            <PWAInstallButton variant="text" />
+            <PWAInstallButton variant="hero" />
           </div>
 
           {/* Quick Search Bar Snippet */}

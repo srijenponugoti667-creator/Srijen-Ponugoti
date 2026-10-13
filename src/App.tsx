@@ -101,7 +101,7 @@ export default function App() {
         id: 'guest_user',
         name: 'Guest Citizen',
         email: 'citizen@justicebridge.in',
-        role: 'litigant',
+        role: 'client',
         phone: '+91 98000 12345',
         membershipActive: false,
         membershipPlan: 'client_annual'

@@ -85,6 +85,7 @@ export interface Hearing {
 export interface CaseMatter {
   id: string;
   caseNumber: string;
+  cnrNumber?: string;
   internalTrackingId: string;
   title: string;
   caseType: 'Commercial Dispute' | 'Constitutional Writ' | 'Cyber Crime' | 'Civil & Property' | 'Corporate Arbitration' | 'Criminal Defense' | 'Family Law' | 'Public Interest Litigation (PIL)';

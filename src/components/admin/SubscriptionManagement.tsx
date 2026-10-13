@@ -17,9 +17,15 @@ export const SubscriptionManagement: React.FC<{ currentUser: User }> = ({ curren
   }, [currentUser]);
 
   const fetchSubscriptions = async () => {
-    const res = await fetch('/api/subscriptions');
-    const data = await res.json();
-    setSubscriptions(data);
+    try {
+      const res = await fetch('/api/subscriptions');
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      setSubscriptions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Subscriptions fetch notice:', err);
+      setSubscriptions([]);
+    }
   };
 
   const deleteSubscription = async (id: string) => {

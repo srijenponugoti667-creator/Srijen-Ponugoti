@@ -877,7 +877,7 @@ app.post('/api/auth/register', apiLimiter, async (req, res) => {
     nextBillingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
     mandateStatus: 'active',
     autoDebitAmount: isLawyer ? 5999 : 2999,
-    consentGiven: true,
+    // consentGiven: true,
     consentTimestamp: new Date().toISOString()
   };
 

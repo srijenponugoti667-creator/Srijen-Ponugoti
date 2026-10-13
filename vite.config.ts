@@ -114,9 +114,9 @@ export default defineConfig(() => {
             },
           ],
         },
+        strategies: 'generateSW',
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],

@@ -4,16 +4,23 @@ import { db } from '../firebase';
 import { User } from '../types';
 import { ShieldCheck, UserPlus, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { assertValidFirestoreId } from '../utils/FirestoreValidation';
+import { handleFirestoreError, OperationType } from '../utils/FirebaseErrorHandling';
 
 export const AdminDashboard: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [promotionEmail, setPromotionEmail] = useState('');
 
+  if (currentUser.role !== 'admin') {
+    return <div className="p-4 text-red-600">Access Denied: Admin privileges required.</div>;
+  }
+
   useEffect(() => {
     const q = query(collection(db, 'verificationRequests'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'verificationRequests');
     });
     return unsubscribe;
   }, []);

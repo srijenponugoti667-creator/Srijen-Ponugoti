@@ -82,6 +82,7 @@ export default function App() {
     try {
       setLoadingUser(true);
       const res = await fetch('/api/auth/current-user');
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.user) {
         setCurrentUser(data.user);

@@ -65,7 +65,8 @@ service cloud.firestore {
 
     // 4. Bar Council Verification Requests
     match /verificationRequests/{requestId} {
-      allow read: if isAuthorizedForVerification() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow get: if isAuthorizedForVerification() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAuthorizedForVerification() || (isSignedIn() && request.query.userId == request.auth.uid);
       allow create: if isSignedIn(); // Advocates can submit
       allow update: if isAuthorizedForVerification() && (
         isAdmin() || 

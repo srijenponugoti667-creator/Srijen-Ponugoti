@@ -76,6 +76,7 @@
     "proxy-addr": "^2.0.8",
     "source-map-js": "^1.2.2",
     "sharp": "^0.35.5",
+    "js-yaml": "^4.1.0",
     "@vitejs/plugin-react": "^5.0.4"
   }
 }

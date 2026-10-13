@@ -672,25 +672,21 @@ async function getAuthenticatedUser(req?: express.Request): Promise<User> {
     }
 
     if (token) {
-      let session = sessionStore.get(token);
-      if (!session) {
-        try {
-          const sessionDoc = await db.collection('sessions').doc(token).get();
-          if (sessionDoc.exists) {
-            session = sessionDoc.data() as SessionRecord;
-            if (session) {
-              sessionStore.set(token, session);
+      // Always fetch session from Firestore as source of truth
+      try {
+        const sessionDoc = await db.collection('sessions').doc(token).get();
+        if (sessionDoc.exists) {
+          const session = sessionDoc.data() as SessionRecord;
+          sessionStore.set(token, session);
+          if (session.expiresAt > Date.now()) {
+            const foundUser = usersMap.get(session.userId);
+            if (foundUser) {
+              return ensureUserTrial(foundUser);
             }
           }
-        } catch {
-          // Graceful fallback if Firestore is unauthenticated or restricted
         }
-      }
-      if (session) {
-        const foundUser = usersMap.get(session.userId);
-        if (session.expiresAt > Date.now() && foundUser) {
-          return ensureUserTrial(foundUser);
-        }
+      } catch (err) {
+        console.warn('Firestore session verification error:', err);
       }
     }
   }
@@ -890,7 +886,9 @@ app.post('/api/auth/register', apiLimiter, async (req, res) => {
     mandateDetails: `UPI AutoPay (${email.split('@')[0]}@okhdfcbank)`,
     nextBillingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
     mandateStatus: 'active',
-    autoDebitAmount: isLawyer ? 5999 : 2999
+    autoDebitAmount: isLawyer ? 5999 : 2999,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString()
   };
 
   users[newId] = newUser;

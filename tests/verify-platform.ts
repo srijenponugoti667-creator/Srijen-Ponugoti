@@ -61,7 +61,13 @@ interface TestResult {
 
 const results: TestResult[] = [];
 
-async function runTest(
+export function assert(condition: unknown, message: string): void {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+export async function runTest(
   id: string,
   category: string,
   title: string,
@@ -71,23 +77,19 @@ async function runTest(
   try {
     const details = await fn();
     const durationMs = Math.round(performance.now() - start);
+    // @ts-ignore
     results.push({ id, category, title, passed: true, details, durationMs });
     console.log(`✅ [${id}] ${title} (${durationMs}ms) — ${details}`);
   } catch (err: any) {
     const durationMs = Math.round(performance.now() - start);
     const details = err?.message || String(err);
+    // @ts-ignore
     results.push({ id, category, title, passed: false, details, durationMs });
     console.error(`❌ [${id}] ${title} (${durationMs}ms) — ${details}`);
   }
 }
 
-function assert(condition: unknown, message: string): void {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-async function apiRequest(
+export async function apiRequest(
   endpoint: string,
   options: {
     method?: string;

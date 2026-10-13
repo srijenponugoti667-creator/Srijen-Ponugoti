@@ -874,7 +874,6 @@ app.post('/api/auth/register', apiLimiter, async (req, res) => {
     membershipActive: true, // 21-Day Free Trial activated with full platform access
     membershipPlan: isLawyer ? 'advocate_annual' : 'client_annual',
     membershipExpiresAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
-    consentProvided: true, // Added consent record
     avatar: isLawyer
       ? 'https://images.unsplash.com/photo-1556157382-97eda2d62296?w=150&auto=format&fit=crop&q=80'
       : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',

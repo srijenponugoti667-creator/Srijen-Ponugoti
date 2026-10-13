@@ -1,11 +1,11 @@
 # ⚖️ JusticeBridge Legal Engine — Technical & Architecture Documentation
 
-**Document Version:** 3.1 (Production & Audit Specification — Changelog Included)  
+**Document Version:** 4.0 (Production & Audit Specification — Changelog Included)  
 **Runtime Stack:** React 19 • TypeScript • Vite 6 • Tailwind CSS v4 • Node.js 22 (Express) • Google Firebase (Auth, Firestore, Storage) • Google Gemini API (`@google/genai`) • Razorpay HMAC-SHA256
 
 ---
 
-## 📑 Changelog (v3.1 Updates)
+## 📑 Changelog (v4.0 Updates)
 * **Fix 1 (BSA Sec 63 Overclaim):** Clarified that raw file byte SHA-256 hash comparison provides cryptographic chain-of-custody verification supporting electronic record certification under Section 63 of the Bharatiya Sakshya Adhiniyam (BSA), 2023, rather than claiming automated judicial admissibility or court approval.
 * **Fix 2 (AUTHZ-05 Clarification):** Explicitly documented that AUTHZ-05 is a static configuration audit assertion verifying `firestore.rules` anti-self-escalation and immutable audit log constraints, complementing dynamic runtime API tests AUTHZ-01 through AUTHZ-04.
 * **Fix 3 (Identifier Clarity):** Renamed/clarified internal tracking identifiers (`justiceBridgeRef: "JB01-649210-2026"`) to explicitly distinguish them from official 16-character e-Courts Case Number Records (CNR).
@@ -50,7 +50,7 @@
 
 To maintain strict engineering and legal transparency, the platform's capabilities are classified across four verification tiers:
 1. **Implemented & Automated-Tested in Codebase** (`26/26` assertions passing via `npm test`).
-2. **Platform-Internal / Simulated Workflows** (internal tracking identifiers and automated credential OCR).
+2. **Platform-Internal / Simulated Workflows** (internal tracking identifiers).
 3. **External Integrations** (Razorpay gateway and Google Gemini API).
 4. **Official Legal Effect** (requires licensed advocate attestation and e-Courts submission).
 
@@ -471,7 +471,7 @@ Target Runtime: http://localhost:3000 | Node: v22.23.2
 * **Notice & Explicit Consent:** Users are presented with clear privacy consent notices upon onboarding regarding data collection for legal case management, advocate directory matching, and statutory research.
 * **Right to Correction & Erasure:** Litigants and advocates maintain full rights to inspect, correct, or request deletion of their personal data and draft case petitions at any time via account settings or `DELETE /api/account`.
 * **Voice & AI Data Minimization:**
-  * Spoken audio in the Voice Case Filer is transcribed locally via the browser SpeechRecognition API; raw audio waveforms are **never** transmitted or stored on the server.
+  * Spoken audio in the Voice Case Filer is processed by the browser's speech service (e.g., Google for Chrome), and the JusticeBridge server only receives the transcript text; raw audio waveforms are never transmitted to or stored on the server.
   * Text sent to the server-side Gemini API (`/api/ai/*`) is stripped of control characters, bounded to strict character limits (`1,000–3,000` chars), and isolated within strict delimiter tags (`<<<USER_QUERY>>>`).
 * **Encryption in Transit & at Rest:** All API communications are secured via TLS 1.3 / HTTPS. Firestore documents and Firebase Storage files are encrypted at rest using Google Cloud default encryption keys.
 * **Audit Logging Separation:** Immutable security audit logs (`securityLogs` / `audit_logs`) store only pseudonymized UIDs, action types, and cryptographic SHA-256 hashes (no raw PII or confidential case narratives) to preserve evidentiary chain-of-custody without violating DPDP privacy mandates.
@@ -483,7 +483,9 @@ In rural legal aid centres or shared cyber-cafes, multiple citizens may use the 
 3. **Cache Purge Handler (`PURGE_SENSITIVE_CACHE`):** Sending `{ type: 'PURGE_SENSITIVE_CACHE' }` to `navigator.serviceWorker.controller` purges all Service Worker caches upon sign-out.
 
 ### 9.3 Backup, Recovery, Secret Rotation & Incident Response
-* **Database Backups:** Cloud Firestore data in production is backed up via daily automated GCP Firestore exports to a restricted Cloud Storage bucket with 30-day point-in-time recovery (PITR).
+* **Database Backups:** Cloud Firestore data in production is backed up via daily automated GCP Firestore exports to a restricted Cloud Storage bucket, with Point-in-Time Recovery (PITR) enabled for 7 days (maximum retention: 7 days).
+  * **Enable PITR:** `gcloud firestore databases update --database='(default)' --point-in-time-recovery=ENABLED`
+  * **Status:** Enabled (7-day retention).
 * **Secret Management & Rotation:** `GEMINI_API_KEY` and `RAZORPAY_KEY_SECRET` are injected via Cloud Run environment variables (never committed to Git).
 * **Security Incident Response:** Any repeated `403` isolation breach attempts or `400 SEC_DOCUMENT_HASH_TAMPER_DETECTED` events are logged with timestamps and security error codes for administrative review.
 

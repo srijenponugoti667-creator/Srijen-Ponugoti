@@ -47,7 +47,8 @@ export interface User {
   mandateStatus?: 'active' | 'pending' | 'cancelled';
   trialCancelled?: boolean;
   autoDebitAmount?: number;
-  consentProvided?: boolean;
+  consentGiven?: boolean;
+  consentTimestamp?: string;
 }
 
 export interface CaseDocument {

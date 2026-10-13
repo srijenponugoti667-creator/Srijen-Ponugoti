@@ -118,19 +118,6 @@ wss.on('connection', (ws) => {
 });
 
 // Security & CORS Configuration
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://apis.google.com"],
-      connectSrc: ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://firebasestorage.googleapis.com", "https://*.googleapis.com", "https://api.razorpay.com"],
-      imgSrc: ["'self'", "data:", "https://firebasestorage.googleapis.com", "https://images.unsplash.com"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-}));
-
 const corsOptions = {
   origin: [
     'http://localhost:3000',
@@ -139,10 +126,12 @@ const corsOptions = {
     'https://justicebridge.in'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Firebase-AppCheck']
 };
 
 app.use(cors(corsOptions));
+
+
 
 
 // Health check endpoints for Google Cloud Run container readiness & liveness probes
@@ -215,6 +204,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
 const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(firebaseApp);
+const appCheck = getAppCheck(firebaseApp);
 
 // Razorpay Credentials Configuration (Strictly read from environment variables; no hardcoded secrets)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';

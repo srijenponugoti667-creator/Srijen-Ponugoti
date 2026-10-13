@@ -136,7 +136,7 @@ export default function App() {
   };
 
   const handleCaseFiled = (newCase: CaseMatter) => {
-    showToast(`Case petition registered with CNR: ${newCase.cnrNumber}`);
+    showToast(`Case petition registered with Tracking ID: ${newCase.internalTrackingId}`);
     setActiveTab('my_cases');
   };
 

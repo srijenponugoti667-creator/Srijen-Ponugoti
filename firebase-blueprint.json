@@ -44,6 +44,30 @@
       },
       "required": ["userId", "action", "timestamp", "resourcePath"]
     },
+    "User": {
+      "title": "User",
+      "description": "Represents a system user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "lawyer", "admin", "team_member"] }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "CaseMatter": {
+      "title": "Case Matter",
+      "description": "Represents a court case.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "internalTrackingId": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "internalTrackingId", "title", "status"]
+    },
     "Subscription": {
       "title": "Subscription",
       "description": "Represents a Razorpay subscription.",
@@ -54,9 +78,55 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "amount", "createdAt"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Represents a user session.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "expiresAt": { "type": "number" }
+      },
+      "required": ["token", "userId", "createdAt", "expiresAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Represents a registered order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "razorpayOrderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "planId": { "type": "string" },
+        "currency": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["orderId", "userId", "amount", "status"]
+    },
+    "ProcessedWebhook": {
+      "title": "Processed Webhook",
+      "description": "Log of processed Razorpay webhooks for idempotency.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "processedAt"]
     }
   },
   "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Collection of all system users."
+    },
+    "cases/{caseId}": {
+      "schema": "CaseMatter",
+      "description": "Collection of all court cases."
+    },
     "verificationRequests/{requestId}": {
       "schema": "VerificationRequest",
       "description": "Collection of manual verification requests for advocates."
@@ -72,6 +142,19 @@
     "subscriptions/{subId}": {
       "schema": "Subscription",
       "description": "Collection of Razorpay subscriptions."
+    },
+    "sessions/{token}": {
+      "schema": "Session",
+      "description": "Collection of user sessions."
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of registered orders."
+    },
+    "processed_webhooks/{webhookId}": {
+      "schema": "ProcessedWebhook",
+      "description": "Collection of processed webhook event IDs."
     }
   }
 }
+

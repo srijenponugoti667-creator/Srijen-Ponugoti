@@ -96,6 +96,22 @@ service cloud.firestore {
       allow update: if isAuthorizedForVerification();
       allow delete: if isAdmin();
     }
+    
+    // 7. Sessions (Server-side only)
+    match /sessions/{token} {
+      allow read, write: if false;
+    }
+
+    // 8. Orders
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // 9. Processed Webhooks (Backend Only)
+    match /processed_webhooks/{webhookId} {
+      allow read, write: if false;
+    }
 
     // Default Deny Fallback
     match /{document=**} {

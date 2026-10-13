@@ -512,22 +512,22 @@ interface SessionRecord {
   createdAt: number;
   expiresAt: number;
 }
-const sessionStore = new Map<string, SessionRecord>();
 
-function createSessionToken(userId: string): string {
+async function createSessionToken(userId: string): Promise<string> {
   const token = `jb_sess_${crypto.randomBytes(32).toString('hex')}`;
-  sessionStore.set(token, {
+  const record: SessionRecord = {
     token,
     userId,
     createdAt: Date.now(),
     expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30-day session
-  });
+  };
+  await db.collection('sessions').doc(token).set(record);
   return token;
 }
 
 // User Context Resolver: Resolves verified cryptographic session token
 // Arbitrary header spoofing (X-User-Id) is strictly eliminated
-function getAuthenticatedUser(req?: express.Request): User {
+async function getAuthenticatedUser(req?: express.Request): Promise<User> {
   if (req) {
     let token: string | undefined;
     const authHeader = req.headers['authorization'];
@@ -537,11 +537,14 @@ function getAuthenticatedUser(req?: express.Request): User {
       token = req.headers['x-session-token'] as string;
     }
 
-    if (token && sessionStore.has(token)) {
-      const session = sessionStore.get(token)!;
-      const foundUser = usersMap.get(session.userId);
-      if (session.expiresAt > Date.now() && foundUser) {
-        return ensureUserTrial(foundUser);
+    if (token) {
+      const sessionDoc = await db.collection('sessions').doc(token).get();
+      if (sessionDoc.exists) {
+        const session = sessionDoc.data() as SessionRecord;
+        const foundUser = usersMap.get(session.userId);
+        if (session.expiresAt > Date.now() && foundUser) {
+          return ensureUserTrial(foundUser);
+        }
       }
     }
   }
@@ -550,8 +553,8 @@ function getAuthenticatedUser(req?: express.Request): User {
   return ensureUserTrial(defaultGuestUser);
 }
 
-function getCurrentUser(req?: express.Request): User {
-  return getAuthenticatedUser(req);
+async function getCurrentUser(req?: express.Request): Promise<User> {
+  return await getAuthenticatedUser(req);
 }
 
 // Consultations Store
@@ -578,7 +581,7 @@ interface RegisteredOrder {
   status: 'created' | 'verified' | 'failed';
 }
 
-const createdOrdersMap = new Map<string, RegisteredOrder>();
+// const createdOrdersMap = new Map<string, RegisteredOrder>();
 const processedPaymentIds = new Set<string>();
 
 // -------------------------------------------------------------
@@ -586,8 +589,8 @@ const processedPaymentIds = new Set<string>();
 // -------------------------------------------------------------
 
 // 1. Get Current User / Issue Verified Session
-app.get('/api/auth/current-user', apiLimiter, (req, res) => {
-  const user = getAuthenticatedUser(req);
+app.get('/api/auth/current-user', apiLimiter, async (req, res) => {
+  const user = await getAuthenticatedUser(req);
   // Ensure an authenticated session token exists for this user
   let token: string | undefined;
   const authHeader = req.headers['authorization'];
@@ -597,8 +600,14 @@ app.get('/api/auth/current-user', apiLimiter, (req, res) => {
     token = req.headers['x-session-token'] as string;
   }
 
-  if (!token || !sessionStore.has(token)) {
-    token = createSessionToken(user.id);
+  if (!token) {
+    token = await createSessionToken(user.id);
+  } else {
+    // Check if session exists in Firestore
+    const sessionDoc = await db.collection('sessions').doc(token).get();
+    if (!sessionDoc.exists) {
+      token = await createSessionToken(user.id);
+    }
   }
 
   res.json({
@@ -739,8 +748,8 @@ app.post('/api/auth/register', apiLimiter, (req, res) => {
 });
 
 // Profile Update
-app.put('/api/users/profile', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.put('/api/users/profile', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -781,9 +790,9 @@ app.put('/api/users/profile', apiLimiter, (req, res) => {
 });
 
 // 2. Bar Council Lawyer Verification Endpoint (Simulated e-KYC with Input Validation)
-app.post('/api/lawyers/verify', apiLimiter, (req, res) => {
+app.post('/api/lawyers/verify', apiLimiter, async (req, res) => {
   const { lawyerId, barCouncilNumber, stateBarCouncil, documentProofUrl } = req.body;
-  const targetUser = getCurrentUser(req);
+  const targetUser = await getCurrentUser(req);
   const targetId = (lawyerId && targetUser.role === 'admin') ? lawyerId : targetUser.id;
   if (targetId === '__proto__' || targetId === 'constructor' || targetId === 'prototype') {
     return res.status(400).json({ error: 'Invalid lawyer ID' });
@@ -1202,9 +1211,9 @@ app.get('/api/lawyers/:id', apiLimiter, (req, res) => {
 });
 
 // Submit Client Review & Update Advocate Performance Statistics
-app.post('/api/lawyers/:id/reviews', apiLimiter, (req, res) => {
+app.post('/api/lawyers/:id/reviews', apiLimiter, async (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser();
+  const user = await getCurrentUser();
   const { rating, caseType, caseOutcome, comment, courtName } = req.body;
 
   const lawyer = lawyersDirectory.find(l => l.id === id);
@@ -1281,8 +1290,8 @@ app.post('/api/lawyers/:id/reviews', apiLimiter, (req, res) => {
 });
 
 // Consultations Bookings API
-app.get('/api/consultations', apiLimiter, (req, res) => {
-  const user = getCurrentUser();
+app.get('/api/consultations', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser();
   let list = [...consultationBookings];
 
   if (user.role === 'client') {
@@ -1294,8 +1303,8 @@ app.get('/api/consultations', apiLimiter, (req, res) => {
   res.json({ consultations: list });
 });
 
-app.post('/api/consultations', apiLimiter, (req, res) => {
-  const user = getCurrentUser();
+app.post('/api/consultations', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser();
   const { lawyerId, lawyerName, bookingDate, timeSlot, consultationType, matterSubject, notes, fee } = req.body;
 
   if (!lawyerId || !bookingDate || !timeSlot || !matterSubject) {
@@ -1325,10 +1334,10 @@ app.post('/api/consultations', apiLimiter, (req, res) => {
   res.status(201).json({ success: true, booking: newBooking });
 });
 
-app.patch('/api/cases/:id/intake', apiLimiter, (req, res) => {
+app.patch('/api/cases/:id/intake', apiLimiter, async (req, res) => {
   const { id } = req.params;
   const { action } = req.body; // 'accept' or 'reject'
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
 
   if (user.role !== 'lawyer' || !user.isVerifiedLawyer) {
     return res.status(403).json({ error: 'Only verified advocates can perform intake actions.' });
@@ -1364,15 +1373,15 @@ app.patch('/api/cases/:id/intake', apiLimiter, (req, res) => {
 });
 
 // All Invoices for current user
-app.get('/api/invoices', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.get('/api/invoices', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const userInvoices = invoices.filter(i => i.userId === user.id);
   res.json({ invoices: userInvoices });
 });
 
 // 4. Case Lookup & Public Search ("Find a Case") with Advanced Filtering
-app.get('/api/cases/search', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.get('/api/cases/search', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const { query, caseType, status, court, delayRiskScore, sortBy } = req.query;
 
   // Filter out cases rejected by this advocate
@@ -1386,7 +1395,7 @@ app.get('/api/cases/search', apiLimiter, (req, res) => {
     return {
       id: c.id,
       caseNumber: c.caseNumber,
-      cnrNumber: c.cnrNumber,
+      internalTrackingId: c.internalTrackingId,
       title: c.title,
       caseType: c.caseType,
       filingDate: c.filingDate,
@@ -1413,7 +1422,7 @@ app.get('/api/cases/search', apiLimiter, (req, res) => {
     const q = query.toLowerCase();
     results = results.filter(c =>
       c.caseNumber.toLowerCase().includes(q) ||
-      c.cnrNumber.toLowerCase().includes(q) ||
+      c.internalTrackingId.toLowerCase().includes(q) ||
       c.title.toLowerCase().includes(q) ||
       c.petitioner.toLowerCase().includes(q) ||
       c.respondent.toLowerCase().includes(q) ||
@@ -1493,8 +1502,8 @@ app.post('/api/transcribe', apiLimiter, async (req, res) => {
 // STRICT DATA SECURITY RULE 2: CLIENT ISOLATION
 // -------------------------------------------------------------
 // "Clients are completely isolated so no client can see another client's cases."
-app.get('/api/cases', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.get('/api/cases', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
 
   if (user.role === 'client') {
     // STRICT CLIENT ISOLATION: Filter ONLY cases belonging to this specific client ID
@@ -1555,9 +1564,9 @@ app.get('/api/cases', apiLimiter, (req, res) => {
 });
 
 // Single Case Detail with Strict Security Checks & Document Sanitization
-app.get('/api/cases/:id', apiLimiter, (req, res) => {
+app.get('/api/cases/:id', apiLimiter, async (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -1628,9 +1637,9 @@ app.get('/api/cases/:id', apiLimiter, (req, res) => {
 // -------------------------------------------------------------
 // STRICT DATA SECURITY RULE 1: ONLY VERIFIED & ASSIGNED LAWYERS CAN VIEW CASE FILES
 // -------------------------------------------------------------
-app.get('/api/cases/:id/files', apiLimiter, (req, res) => {
+app.get('/api/cases/:id/files', apiLimiter, async (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const caseItem = casesStore.find(c => c.id === id);
 
   if (!caseItem) {
@@ -1694,8 +1703,8 @@ app.get('/api/cases/:id/files', apiLimiter, (req, res) => {
 });
 
 // Create / File a new legal case matter (Strict Input Validation)
-app.post('/api/cases/file', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.post('/api/cases/file', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const { title, caseType, courtName, respondent, summaryBrief, assignedLawyerId } = req.body;
 
   if (!title || typeof title !== 'string' || title.trim().length < 3) {
@@ -1725,7 +1734,7 @@ app.post('/api/cases/file', apiLimiter, (req, res) => {
   const newCase: CaseMatter = {
     id: newCaseId,
     caseNumber: `MISC/${cleanCourtName.includes('Delhi') ? 'DL' : 'KA'}/2026/${randomCaseNum}`,
-    cnrNumber: `JB01-${randomCnrSuffix}-2026`,
+    internalTrackingId: `JB01-${randomCnrSuffix}-2026`,
     title: cleanTitle,
     caseType: cleanCaseType as any,
     filingDate: new Date().toISOString().split('T')[0],
@@ -1789,9 +1798,9 @@ app.post('/api/cases/file', apiLimiter, (req, res) => {
 });
 
 // Upload document to a case (Supports raw file-byte SHA-256 digest or server-computed SHA-256)
-app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
+app.post('/api/cases/:id/documents', apiLimiter, async (req, res) => {
   const { id } = req.params;
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const {
     title,
     fileName,
@@ -1893,9 +1902,9 @@ app.post('/api/cases/:id/documents', apiLimiter, (req, res) => {
 });
 
 // Verify SHA-256 Document Hash Integrity (Section 63 BSA 2023 / Section 65B IEA Chain-of-Custody Verification)
-app.post('/api/cases/:id/documents/:docId/verify-hash', apiLimiter, (req, res) => {
+app.post('/api/cases/:id/documents/:docId/verify-hash', apiLimiter, async (req, res) => {
   const { id, docId } = req.params;
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { candidateHash, fileContentBase64 } = req.body;
 
   const caseItem = casesStore.find(c => c.id === id);
@@ -1965,8 +1974,8 @@ app.post('/api/cases/:id/documents/:docId/verify-hash', apiLimiter, (req, res) =
 // - Clients must see a notification to pay a membership fee of 2,999 Rupees per year.
 // - Advocates/Lawyers must see a notification to pay a membership fee of 5,999 Rupees per year.
 
-app.get('/api/membership/status', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.get('/api/membership/status', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const isLawyer = user.role === 'lawyer';
 
   if (isLawyer) {
@@ -2044,7 +2053,7 @@ app.get('/api/membership/status', apiLimiter, (req, res) => {
 
 // Checkout initiation
 app.post('/api/membership/checkout', apiLimiter, async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { paymentMethod } = req.body;
 
   const isLawyer = user.role === 'lawyer';
@@ -2078,7 +2087,7 @@ app.post('/api/membership/checkout', apiLimiter, async (req, res) => {
   }
 
   // Register order in server state for verification cross-checking
-  createdOrdersMap.set(internalOrderId, {
+  const newOrder: RegisteredOrder = {
     orderId: internalOrderId,
     razorpayOrderId,
     userId: user.id,
@@ -2087,9 +2096,10 @@ app.post('/api/membership/checkout', apiLimiter, async (req, res) => {
     currency: 'INR',
     createdAt: new Date().toISOString(),
     status: 'created'
-  });
+  };
+  await db.collection('orders').doc(internalOrderId).set(newOrder);
   if (razorpayOrderId !== internalOrderId) {
-    createdOrdersMap.set(razorpayOrderId, createdOrdersMap.get(internalOrderId)!);
+    await db.collection('orders').doc(razorpayOrderId).set(newOrder);
   }
 
   res.json({
@@ -2113,8 +2123,8 @@ app.post('/api/membership/checkout', apiLimiter, async (req, res) => {
 });
 
 // Verify & Activate Membership Payment (Enforces strict signature, order ownership & anti-replay verification)
-app.post('/api/membership/verify-payment', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.post('/api/membership/verify-payment', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const { orderId, paymentMethod, transactionId, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount } = req.body;
 
   // 1. REJECT ZERO OR NEGATIVE PAYMENT ATTEMPTS
@@ -2127,14 +2137,22 @@ app.post('/api/membership/verify-payment', apiLimiter, (req, res) => {
 
   // 2. MANDATORY PRE-RECORDED SERVER ORDER LOOKUP
   const lookupOrderId = razorpay_order_id || orderId;
-  if (!lookupOrderId || !createdOrdersMap.has(lookupOrderId)) {
+  if (!lookupOrderId) {
+    return res.status(400).json({
+      error: 'Unregistered order: Payment verification requires a pre-recorded server order.',
+      securityCode: 'SEC_UNREGISTERED_ORDER_REJECTED'
+    });
+  }
+  
+  const orderDoc = await db.collection('orders').doc(lookupOrderId).get();
+  if (!orderDoc.exists) {
     return res.status(400).json({
       error: 'Unregistered order: Payment verification requires a pre-recorded server order.',
       securityCode: 'SEC_UNREGISTERED_ORDER_REJECTED'
     });
   }
 
-  const recordedOrder = createdOrdersMap.get(lookupOrderId)!;
+  const recordedOrder = orderDoc.data() as RegisteredOrder;
 
   // 3. ENFORCE ORDER OWNERSHIP (Must belong to authenticated user)
   if (recordedOrder.userId !== user.id) {
@@ -2258,8 +2276,8 @@ app.post('/api/membership/verify-payment', apiLimiter, (req, res) => {
 });
 
 // Setup / Update Auto-Payment Mandate (Option A: 21-Day Free Trial Mandate Registration)
-app.post('/api/membership/setup-mandate', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.post('/api/membership/setup-mandate', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const { mandateMethod, mandateDetails } = req.body;
   const isLawyer = user.role === 'lawyer';
   const planFee = isLawyer ? 5999 : 2999;
@@ -2297,8 +2315,8 @@ app.post('/api/membership/setup-mandate', apiLimiter, (req, res) => {
 });
 
 // Cancel Auto-Payment Mandate (1-click cancel before Day 22)
-app.post('/api/membership/cancel-mandate', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.post('/api/membership/cancel-mandate', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   // codeql[js/prototype-polluting-assignment]
   user.autoPaymentMandateActive = false;
   // codeql[js/prototype-polluting-assignment]
@@ -2315,8 +2333,8 @@ app.post('/api/membership/cancel-mandate', apiLimiter, (req, res) => {
 });
 
 // Simulate / Trigger Day 22 Auto-Payment Immediately (for testing or automated cron execution)
-app.post('/api/membership/trigger-day22-autopay', apiLimiter, (req, res) => {
-  const user = getCurrentUser(req);
+app.post('/api/membership/trigger-day22-autopay', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
   const isLawyer = user.role === 'lawyer';
   const totalAmount = isLawyer ? 5999 : 2999;
   const baseAmount = Math.round((totalAmount / 1.18) * 100) / 100;
@@ -2378,7 +2396,7 @@ app.post('/api/membership/trigger-day22-autopay', apiLimiter, (req, res) => {
 
 // 5. AI Delay Reduction Engine (Using @google/genai with fallback)
 app.post('/api/ai/delay-analysis', apiLimiter, async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { caseId } = req.body;
   const caseItem = casesStore.find(c => c.id === caseId) || (casesStore.length > 0 ? casesStore[0] : null);
 
@@ -2578,7 +2596,7 @@ app.post('/api/ai/legal-chat', apiLimiter, async (req, res) => {
 
 // 7. Voice Case Filing Engine (For Illiterate / Rural / Multi-lingual Citizens)
 app.post('/api/ai/voice-file-case', apiLimiter, async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { voiceTranscript, languageCode, languageName, autoFile } = req.body;
 
   if (!voiceTranscript || typeof voiceTranscript !== 'string') {
@@ -2685,7 +2703,7 @@ app.post('/api/ai/voice-file-case', apiLimiter, async (req, res) => {
     registeredCase = {
       id: newCaseId,
       caseNumber: `VOICE-PET/${new Date().getFullYear()}/${randomCaseNum}`,
-      cnrNumber: `JB01-${randomCnrSuffix}-${new Date().getFullYear()}`,
+      internalTrackingId: `JB01-${randomCnrSuffix}-${new Date().getFullYear()}`,
       title: extractedData.title,
       caseType: (extractedData.caseType as any) || 'Civil & Property',
       filingDate: new Date().toISOString().split('T')[0],
@@ -2749,6 +2767,52 @@ app.post('/api/ai/voice-file-case', apiLimiter, async (req, res) => {
     extractedData,
     registeredCase
   });
+});
+
+// Razorpay Webhook
+app.post('/api/webhooks/razorpay', apiLimiter, async (req, res) => {
+  const signature = req.headers['x-razorpay-signature'];
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+  if (!signature || !webhookSecret) {
+    return res.status(400).json({ error: 'Missing signature or secret' });
+  }
+
+  // Verify signature
+  const hmac = crypto.createHmac('sha256', webhookSecret);
+  hmac.update((req as any).rawBody);
+  const expectedSignature = hmac.digest('hex');
+
+  if (signature !== expectedSignature) {
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  const event = req.body;
+  if (event.event === 'payment.captured') {
+    const paymentId = event.payload.payment.entity.id;
+    const userId = event.payload.payment.entity.notes.userId;
+
+    // Idempotency
+    const webhookDocRef = db.collection('processed_webhooks').doc(event.id);
+    const webhookDoc = await webhookDocRef.get();
+    if (webhookDoc.exists) {
+      return res.status(200).json({ message: 'Already processed' });
+    }
+
+    // Update user membership
+    await db.collection('users').doc(userId).update({
+      membershipStatus: 'active',
+      lastPaymentId: paymentId
+    });
+
+    // Mark as processed
+    await webhookDocRef.set({
+      id: event.id,
+      processedAt: new Date().toISOString()
+    });
+  }
+
+  res.status(200).json({ message: 'OK' });
 });
 
 // Platform Statistics (Dynamic calculation from live platform state)

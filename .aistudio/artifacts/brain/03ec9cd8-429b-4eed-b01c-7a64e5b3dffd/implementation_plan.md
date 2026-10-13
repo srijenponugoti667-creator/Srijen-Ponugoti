@@ -1,51 +1,34 @@
-# JusticeBridge 10/10 Production Roadmap
+# JusticeBridge Implementation & Documentation Plan v4.0
 
-This plan outlines the critical fixes to achieve a 10/10 production-ready status, addressing persistent state, security, and compliance blockers.
+## Phase 1: Documentation & Governance
+- [ ] Rewrite changelog for v4.0 (list only what changed).
+- [ ] Replace "ICRA/ESRB 18+" with "Pending IARC certificate".
+- [ ] Update Section 9 (Grievance officer, breach-notification, retention, processor list, children's data, user-rights).
+- [ ] Wording fixes ("rule-based classification" for delay risk; folder/repo name match; audio privacy wording).
+- [ ] Add Operations section.
+- [ ] Add Production Readiness Checklist (Done / Pending-external + evidence).
 
-## User Review & Critical Decisions
+## Phase 2: Security & Backend Implementation
+- [ ] Implement Helmet + strict CSP.
+- [ ] Configure strict CORS allowlist.
+- [ ] Firestore as source of truth for /sessions and /orders.
+- [ ] Server-side Firebase ID token verification.
+- [ ] Razorpay webhook (signature + idempotency).
+- [ ] Implement DELETE /api/account endpoint.
+- [ ] Add consent record at onboarding.
 
-> [!IMPORTANT]
-> The following technical changes are required to transition from a prototype to a production-grade legal platform.
+## Phase 3: Testing & Verification
+- [ ] Firebase Emulator rules tests (replace AUTHZ-05).
+- [ ] Restart persistence test.
+- [ ] Webhook tests (valid/invalid/replay).
+- [ ] DELETE /api/account test.
+- [ ] XSS/sanitization test.
+- [ ] Playwright e2e test.
+- [ ] Wire tests into CI.
+- [ ] Generate raw `npm test` output.
 
-- **Persistent State**: Migration of in-memory data (users, cases, consultations) to Cloud Firestore.
-- **Rules Testing**: Implementing Firebase Emulator for `firestore.rules` validation.
-- **Naming Consistency**: Renaming `cnrNumber` to `internalTrackingId` across all schemas.
-- **Compliance**: Adding consent notices and DPDP-compliant structures.
-
-## 1. Overview & Core Concept
-
-**Goal**: Transform JusticeBridge from a functional prototype with simulated data into a secure, persistent, audit-ready Indian legal-tech platform.
-
-## 2. User Experience & Visual Design
-
-- **Flows**: The core user experience remains consistent, but will now be powered by durable, multi-instance persistent storage (Firestore).
-- **Compliance**: Addition of a DPDP-compliant consent notice on first-time boot.
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Firestore Migration**
-    - *Chosen Approach*: Replace in-memory Maps and Arrays with Firestore collections (`users`, `cases`, `consultations`, `invoices`).
-    - *Why*: Enables multi-instance scalability on Cloud Run and guarantees anti-replay integrity for payment and evidence chain-of-custody.
-- **Decision 2: Renaming Identifiers**
-    - *Chosen Approach*: Rename `cnrNumber` to `internalTrackingId`.
-    - *Why*: Eliminates misleading legal claims and aligns documentation with technical reality.
-
-## 4. Technical Architecture & Data Strategy
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                  BROWSER CLIENT (React SPA)                  │
-└──────────────┬──────────────────────────────┬────────────────┘
-               │ HTTPS (Bearer Auth)          │
-┌──────────────▼──────────────────────────────▼────────────────┐
-│               TRUSTED BACKEND SERVER (Node.js)               │
-│  [1. Rate Limiter] -> [2. Auth/Sanitizer] -> [3. API Logic]  │
-└──────────────┬──────────────────────────────┬────────────────┘
-               │ CRUD Operations              │ 
-┌──────────────▼──────────────────────────────▼────────────────┐
-│             CLOUD FIRESTORE (Persistent Storage)             │
-│ [users] [cases] [consultations] [invoices] [cyberComplaints] │
-└──────────────────────────────────────────────────────────────┘
-```
-- **Data Model**: Firestore entities for `User`, `Case`, `Consultation`, `Invoice`.
-- **State Strategy**: All ephemeral in-memory state will be persisted in Firestore to support horizontal scaling.
+## Phase 4: Final Documentation Traceability
+- [ ] Add curl samples + real responses for all endpoints.
+- [ ] Explain jb_sess_ vs Firebase Auth.
+- [ ] Add Claim Traceability table (claim | file/line | test ID).
+- [ ] Compile "Needs my action" list.

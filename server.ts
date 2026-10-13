@@ -11,8 +11,27 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getAppCheck } from 'firebase-admin/app-check';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import helmet from 'helmet';
+import cors from 'cors';
+
+// Server-side Firebase ID token verification middleware
+async function verifyIdTokenMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+  }
+  const idToken = authHeader.substring(7);
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    (req as any).user = decodedToken;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+}
 
 import type { CaseMatter, LawyerProfile, User, PaymentInvoice, CaseDocument, ConsultationBooking, LawyerReview } from './src/types.ts';
+
 
 // Global process error resilience: Guard against unhandled gRPC or Firebase stream rejections crashing the process
 process.on('uncaughtException', (err: any) => {
@@ -27,6 +46,34 @@ const app = express();
 // Enable trust proxy so express-rate-limit can accurately detect the client's actual IP
 // behind the Google Cloud Run & Nginx reverse proxy load balancers.
 app.set('trust proxy', 1);
+
+// Secure headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://trusted-scripts.example.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://firebasestorage.googleapis.com"],
+      connectSrc: ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com"],
+    },
+  },
+}));
+
+// Strict CORS
+const allowedOrigins = ['https://justicebridge-prod.web.app', 'https://justicebridge.com'];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Firebase-AppCheck'],
+  credentials: true,
+}));
 
 // Detect production environment:
 // 1. Explicit NODE_ENV === 'production' or npm start
@@ -70,16 +117,33 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Permissive CORS & Asset Serving for PWA Builders and external verification crawlers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+// Security & CORS Configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://apis.google.com"],
+      connectSrc: ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://firebasestorage.googleapis.com", "https://*.googleapis.com", "https://api.razorpay.com"],
+      imgSrc: ["'self'", "data:", "https://firebasestorage.googleapis.com", "https://images.unsplash.com"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+}));
+
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'https://ais-dev-2ygeqzn4xbgemovtatd7wg-621467385062.asia-southeast1.run.app',
+    'https://ais-pre-2ygeqzn4xbgemovtatd7wg-621467385062.asia-southeast1.run.app',
+    'https://justicebridge.in'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+
 
 // Health check endpoints for Google Cloud Run container readiness & liveness probes
 app.get(['/health', '/api/health'], apiLimiter, (req, res) => {
@@ -186,6 +250,18 @@ app.post('/api/payments/create-subscription', apiLimiter, async (req, res) => {
     });
     
     // Store in a local order map for now, or just send back
+    const orderRecord: RegisteredOrder = {
+      orderId: subscription.id,
+      razorpayOrderId: subscription.id,
+      userId: userId,
+      amount: 2999,
+      planId: planId,
+      currency: 'INR',
+      createdAt: new Date().toISOString(),
+      status: 'created'
+    };
+    createdOrdersMap.set(subscription.id, orderRecord);
+    await saveOrderToFirestore(subscription.id, orderRecord);
     res.json(subscription);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create subscription.' });
@@ -255,36 +331,52 @@ app.post('/api/payments/webhook', apiLimiter, async (req, res) => {
     .update(rawBody)
     .digest('hex');
 
-  if (expectedSignature === signature) {
-    const event = req.body.event;
-    try {
-      const userId = req.body.payload?.subscription?.entity?.notes?.userId;
-      if (event === 'subscription.charged') {
-        if (userId && usersMap.has(userId)) {
-          const user = usersMap.get(userId);
-          if (user) user.membershipActive = true;
-        }
-        if (userId) {
-          const userRef = db.collection('users').doc(userId);
-          await userRef.update({ membershipActive: true, nextBillingDate: new Date().toISOString() });
-        }
-      } else if (event === 'subscription.cancelled') {
-        if (userId && usersMap.has(userId)) {
-          const user = usersMap.get(userId);
-          if (user) user.membershipActive = false;
-        }
-        if (userId) {
-          const userRef = db.collection('users').doc(userId);
-          await userRef.update({ membershipActive: false });
-        }
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
-    }
-    res.status(200).send('OK');
-  } else {
-    res.status(400).send('Invalid signature');
+  if (expectedSignature !== signature) {
+    return res.status(400).send('Invalid signature');
   }
+
+  const eventId = req.body.id;
+  if (!eventId) return res.status(400).send('Missing event ID');
+
+  // Idempotency check
+  if (processedWebhooksSet.has(eventId)) return res.status(200).send('OK');
+  const webhookDoc = await db.collection('processed_webhooks').doc(eventId).get();
+  if (webhookDoc.exists) {
+    processedWebhooksSet.add(eventId);
+    return res.status(200).send('OK');
+  }
+
+  const event = req.body.event;
+  try {
+    const userId = req.body.payload?.subscription?.entity?.notes?.userId;
+    if (event === 'subscription.charged') {
+      if (userId && usersMap.has(userId)) {
+        const user = usersMap.get(userId);
+        if (user) user.membershipActive = true;
+      }
+      if (userId) {
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({ membershipActive: true, nextBillingDate: new Date().toISOString() });
+      }
+    } else if (event === 'subscription.cancelled') {
+      if (userId && usersMap.has(userId)) {
+        const user = usersMap.get(userId);
+        if (user) user.membershipActive = false;
+      }
+      if (userId) {
+        const userRef = db.collection('users').doc(userId);
+        await userRef.update({ membershipActive: false });
+      }
+    }
+    
+    // Mark as processed
+    await db.collection('processed_webhooks').doc(eventId).set({ processedAt: new Date().toISOString() });
+    processedWebhooksSet.add(eventId);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'users');
+    return res.status(500).send('Internal Error');
+  }
+  res.status(200).send('OK');
 });
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -639,10 +731,24 @@ const createdOrdersMap = new Map<string, RegisteredOrder>();
 const processedPaymentIds = new Set<string>();
 const processedWebhooksSet = new Set<string>();
 
-// Global resilience handlers: Prevent unhandled gRPC or Firebase exceptions from terminating process
-process.on('unhandledRejection', (reason) => {
-  console.warn('Unhandled rejection handled gracefully:', (reason as any)?.message || reason);
-});
+// Helper: Ensure order persistence in Firestore
+async function saveOrderToFirestore(orderId: string, orderData: RegisteredOrder): Promise<void> {
+  try {
+    await db.collection('orders').doc(orderId).set(orderData);
+  } catch (err: any) {
+    console.warn('Order Firestore persistence error:', err?.message || err);
+  }
+}
+
+async function loadOrderFromFirestore(orderId: string): Promise<RegisteredOrder | null> {
+  try {
+    const doc = await db.collection('orders').doc(orderId).get();
+    if (doc.exists) return doc.data() as RegisteredOrder;
+  } catch (err: any) {
+    console.warn('Order Firestore load error:', err?.message || err);
+  }
+  return null;
+}
 
 // -------------------------------------------------------------
 // REST API ENDPOINTS & BACKEND SECURITY ENFORCEMENT
@@ -710,6 +816,21 @@ app.post('/api/auth/switch-persona', apiLimiter, async (req, res) => {
 });
 
 // Auth Registration (Strictly restricted to 'client' and 'lawyer' roles)
+app.delete('/api/account', verifyIdTokenMiddleware, async (req, res) => {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    await db.collection('users').doc(user.uid).delete();
+    usersMap.delete(user.uid);
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'users');
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 app.post('/api/auth/register', apiLimiter, async (req, res) => {
   const { name, email, role, phone, barCouncilNumber, stateBarCouncil, practiceLocation, yearsExperience, specialization, consultationFee, bio } = req.body;
 
@@ -753,6 +874,7 @@ app.post('/api/auth/register', apiLimiter, async (req, res) => {
     membershipActive: true, // 21-Day Free Trial activated with full platform access
     membershipPlan: isLawyer ? 'advocate_annual' : 'client_annual',
     membershipExpiresAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    consentProvided: true, // Added consent record
     avatar: isLawyer
       ? 'https://images.unsplash.com/photo-1556157382-97eda2d62296?w=150&auto=format&fit=crop&q=80'
       : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',

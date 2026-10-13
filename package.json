@@ -63,7 +63,6 @@
   "overrides": {
     "@grpc/grpc-js": "^1.12.6",
     "braces": "^3.0.3",
-    "brace-expansion": "^2.0.1",
     "fast-uri": "^3.0.6",
     "fast-xml-parser": "^4.5.3",
     "qs": "^6.14.0",

@@ -27,6 +27,7 @@ import { InstallAppBanner } from './components/InstallAppBanner';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
 import { CaseUpdateNotifier } from './components/CaseUpdateNotifier';
+import { FCMNotificationBanner } from './components/FCMNotificationBanner';
 import { User, LawyerProfile, CaseMatter, PaymentInvoice } from './types';
 import { Scale, ShieldCheck, Lock, Clock, Crown, ArrowRight, Heart, FileText, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { getTranslation } from './languages';
@@ -187,6 +188,9 @@ export default function App() {
             }}
             currentLanguage={currentLanguage}
           />
+
+          {/* 3. FCM Push Notification Banner */}
+          <FCMNotificationBanner />
         </>
       )}
 

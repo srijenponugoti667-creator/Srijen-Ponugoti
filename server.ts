@@ -7,10 +7,11 @@ import Razorpay from 'razorpay';
 import rateLimit from 'express-rate-limit';
 import { WebSocketServer } from 'ws';
 import { GoogleGenAI } from '@google/genai';
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAppCheck } from 'firebase-admin/app-check';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getMessaging } from 'firebase-admin/messaging';
 import helmet from 'helmet';
 import cors from 'cors';
 
@@ -47,31 +48,20 @@ const app = express();
 // behind the Google Cloud Run & Nginx reverse proxy load balancers.
 app.set('trust proxy', 1);
 
-// Secure headers with Helmet
+// Secure headers with Helmet configured for iframe embedding & Vite development
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://trusted-scripts.example.com"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https://firebasestorage.googleapis.com"],
-      connectSrc: ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com"],
-    },
-  },
+  contentSecurityPolicy: false,
+  frameguard: false, // Essential: allows Google AI Studio preview iframe to embed the app
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false,
 }));
 
-// Strict CORS
-const allowedOrigins = ['https://justicebridge-prod.web.app', 'https://justicebridge.com'];
+// CORS configuration supporting local development, AI Studio preview, and production domains
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Firebase-AppCheck'],
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Firebase-AppCheck'],
   credentials: true,
 }));
 
@@ -116,22 +106,6 @@ wss.on('connection', (ws) => {
     console.log('Received:', message);
   });
 });
-
-// Security & CORS Configuration
-const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'https://ais-dev-2ygeqzn4xbgemovtatd7wg-621467385062.asia-southeast1.run.app',
-    'https://ais-pre-2ygeqzn4xbgemovtatd7wg-621467385062.asia-southeast1.run.app',
-    'https://justicebridge.in'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Firebase-AppCheck']
-};
-
-app.use(cors(corsOptions));
-
-
 
 
 // Health check endpoints for Google Cloud Run container readiness & liveness probes
@@ -178,8 +152,10 @@ const firebaseConfig = fs.existsSync(firebaseConfigPath)
   : { projectId: 'zealous-pod-b09p9', firestoreDatabaseId: '(default)' };
 
 // Initialize Firebase Admin
-let firebaseApp;
-if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+let firebaseApp: any;
+if (getApps().length > 0) {
+  firebaseApp = getApp();
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
     if (serviceAccount && serviceAccount.project_id) {
@@ -204,7 +180,12 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
 const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(firebaseApp);
-const appCheck = getAppCheck(firebaseApp);
+let appCheck: any = null;
+try {
+  appCheck = getAppCheck(firebaseApp);
+} catch (e) {
+  // AppCheck is optional during local development
+}
 
 // Razorpay Credentials Configuration (Strictly read from environment variables; no hardcoded secrets)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
@@ -1550,6 +1531,88 @@ app.patch('/api/cases/:id/intake', apiLimiter, async (req, res) => {
 
   res.json({ success: true, case: caseMatter });
 });
+
+// Register FCM Token for real-time push notifications
+app.post('/api/fcm/token', apiLimiter, async (req, res) => {
+  try {
+    const { token, userId } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'FCM token is required' });
+    }
+    const targetUserId = userId || 'guest_user';
+    await db.collection('users').doc(targetUserId).set({
+      fcmToken: token,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    res.json({ success: true, message: 'FCM token registered successfully' });
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+    res.status(500).json({ error: 'Failed to register FCM token' });
+  }
+});
+
+// Update case status and push real-time FCM notification to client
+app.patch('/api/cases/:id/status', apiLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+    const caseItem = casesStore.find(c => c.id === id);
+    if (!caseItem) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    const oldStatus = caseItem.status;
+    caseItem.status = status;
+    if (remarks) {
+      (caseItem as any).remarks = remarks;
+      if (!caseItem.hearings) caseItem.hearings = [];
+      caseItem.hearings.unshift({
+        id: 'h_' + Math.random().toString(36).substring(2, 9),
+        hearingDate: new Date().toISOString().split('T')[0],
+        courtRoom: caseItem.courtName || 'Court Room 1',
+        judgeName: caseItem.judgeName || 'Hon. Judge',
+        stage: status,
+        purpose: remarks,
+        status: 'Scheduled'
+      });
+    }
+
+    // Attempt to send FCM push notification to client
+    const clientId = caseItem.clientId;
+    if (clientId) {
+      try {
+        const userDoc = await db.collection('users').doc(clientId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          const fcmToken = userData?.fcmToken;
+          if (fcmToken) {
+            await getMessaging().send({
+              token: fcmToken,
+              notification: {
+                title: `⚖️ Case Status Update: ${caseItem.title || 'Your Case'}`,
+                body: `Status changed from "${oldStatus}" to "${status}". ${remarks ? 'Notes: ' + remarks : ''}`
+              },
+              data: {
+                caseId: id,
+                status: status,
+                click_action: '/cases'
+              }
+            });
+            console.log(`FCM push notification sent successfully for case ${id} to client ${clientId}`);
+          }
+        }
+      } catch (fcmErr) {
+        console.warn('FCM push dispatch note (non-fatal):', fcmErr);
+      }
+    }
+
+    res.json({ success: true, case: caseItem });
+  } catch (error) {
+    console.error('Error updating case status:', error);
+    res.status(500).json({ error: 'Failed to update case status' });
+  }
+});
+
 
 // All Invoices for current user
 app.get('/api/invoices', apiLimiter, async (req, res) => {

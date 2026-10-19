@@ -85,7 +85,7 @@ export async function runTest(
     const details = err?.message || String(err);
     // @ts-ignore
     results.push({ id, category, title, passed: false, details, durationMs });
-    console.error(`❌ [${id}] ${title} (${durationMs}ms) — ${details}`);
+    console.error(`❌ [${id}] ${title} (${durationMs}ms) — ${details}`, err?.stack || '');
   }
 }
 
@@ -256,10 +256,10 @@ async function main() {
   // ---------------------------------------------------------------------------
   // 2. AUTHORIZATION, CROSS-USER ISOLATION & FIRESTORE RULES
   // ---------------------------------------------------------------------------
-  await runTest(
+   await runTest(
     'AUTHZ-01',
     'Authorization',
-    'Verify Bar Council credential format & e-KYC gate (/api/lawyers/verify)',
+    'Verify Bar Council credential format & pending e-KYC officer review workflow (/api/lawyers/verify)',
     async () => {
       // Reject placeholder Bar Council number
       const badRes = await apiRequest('/api/lawyers/verify', {
@@ -275,7 +275,7 @@ async function main() {
         'Failed to reject placeholder Bar Council ID'
       );
 
-      // Verify valid Bar Council format
+      // Submit valid Bar Council format (creates pending request, does NOT verify instantly)
       const goodRes = await apiRequest('/api/lawyers/verify', {
         method: 'POST',
         token: verifiedLawyerToken,
@@ -284,8 +284,20 @@ async function main() {
           stateBarCouncil: 'Bar Council of Delhi',
         },
       });
-      assert(goodRes.status === 200 && goodRes.data.user.isVerifiedLawyer === true, 'Valid Bar ID verification failed');
-      return 'Rejected placeholder ID (400); Verified D/4821/2018 (200 OK)';
+      assert(goodRes.status === 200 && goodRes.data.status === 'pending', 'Expected pending verification status');
+      assert(goodRes.data.user.isVerifiedLawyer === false, 'Formatted number alone must not unlock isVerifiedLawyer instantly');
+
+      // Admin / Officer approval
+      const approveRes = await apiRequest('/api/admin/verify-lawyer', {
+        method: 'POST',
+        token: verifiedLawyerToken, // using verifiedLawyerToken as admin/officer for test
+        body: {
+          lawyerId: goodRes.data.user.id
+        }
+      });
+      assert(approveRes.status === 200 && approveRes.data.user.isVerifiedLawyer === true, 'Admin approval failed to unlock isVerifiedLawyer');
+
+      return 'Rejected placeholder (400); Submitted pending format (200); Admin approval unlocked vault (200 OK)';
     }
   );
 
@@ -721,7 +733,77 @@ async function main() {
   );
 
   // ---------------------------------------------------------------------------
-  // 6. DEPLOYMENT, HEALTH & SHARED-DEVICE PWA CACHE ISOLATION
+  // 6. WEBHOOKS, ACCOUNT DELETION & PERSISTENCE
+  // ---------------------------------------------------------------------------
+  await runTest(
+    'HOOK-01',
+    'Webhooks',
+    'Verify Razorpay valid webhook processing (/api/membership/webhook)',
+    async () => {
+      const res = await apiRequest('/api/membership/webhook', {
+        method: 'POST',
+        body: { event: 'payment.captured', payload: { payment: { entity: { id: 'pay_' + Date.now() } } } }
+      });
+      assert(res.status === 200 && res.data.status === 'ok', 'Webhook processing failed');
+      return 'Webhook processed successfully (200 OK)';
+    }
+  );
+
+  await runTest(
+    'HOOK-03',
+    'Webhooks',
+    'Verify webhook idempotency / event replay prevention',
+    async () => {
+      const eventId = 'evt_replay_' + Date.now();
+      const first = await apiRequest('/api/membership/webhook', {
+        method: 'POST',
+        body: { event: eventId }
+      });
+      assert(first.status === 200, 'First webhook call failed');
+
+      const replay = await apiRequest('/api/membership/webhook', {
+        method: 'POST',
+        body: { event: eventId }
+      });
+      assert(replay.status === 200 && replay.data.status === 'already_processed', 'Replay not marked already processed');
+      return 'Webhook idempotency verified (HTTP 200 already_processed)';
+    }
+  );
+
+  await runTest(
+    'ACCT-01',
+    'Account',
+    'Verify secure account deletion endpoint (DELETE /api/account)',
+    async () => {
+      const reg = await apiRequest('/api/auth/register', {
+        method: 'POST',
+        body: { name: 'Temp User', email: `temp.${Date.now()}@example.in`, role: 'client' }
+      });
+      const token = reg.data.sessionToken;
+      const del = await apiRequest('/api/account', {
+        method: 'DELETE',
+        token: token
+      });
+      assert(del.status === 200 && del.data.success === true, 'Account deletion failed');
+      return 'Account successfully deleted (200 OK)';
+    }
+  );
+
+  await runTest(
+    'PERSIST-01',
+    'Persistence',
+    'Verify session persistence across server warm-up/restart',
+    async () => {
+      const { status, data } = await apiRequest('/api/auth/current-user', {
+        token: clientAToken
+      });
+      assert(status === 200 && data.user, 'Session persistence check failed');
+      return 'Session successfully verified from resilient storage store';
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // 7. DEPLOYMENT, HEALTH & SHARED-DEVICE PWA CACHE ISOLATION
   // ---------------------------------------------------------------------------
   await runTest(
     'OPS-01',

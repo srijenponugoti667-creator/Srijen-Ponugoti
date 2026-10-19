@@ -49,6 +49,8 @@ export interface User {
   autoDebitAmount?: number;
   consentGiven?: boolean;
   consentTimestamp?: string;
+  firebaseUid?: string;
+  fcmToken?: string;
 }
 
 export interface CaseDocument {

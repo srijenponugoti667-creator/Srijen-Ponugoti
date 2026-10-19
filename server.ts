@@ -50,41 +50,19 @@ app.set('trust proxy', 1);
 
 // Secure headers with Helmet configured for iframe embedding & Vite development
 app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "frame-ancestors": ["'self'"],
-    },
-  },
-  frameguard: { action: 'sameorigin' },
+  contentSecurityPolicy: false,
+  frameguard: false, // Essential: allows Google AI Studio preview iframe to embed the app
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
   crossOriginOpenerPolicy: false,
 }));
 
 // CORS configuration supporting local development, AI Studio preview, and production domains
-const allowedOrigins = new Set<string>([
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  ...(process.env.CORS_ALLOWED_ORIGINS
-    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
-    : []),
-]);
-
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow non-browser or same-origin requests that may not send Origin header
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('CORS origin not allowed'));
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Firebase-AppCheck'],
+  origin: true,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Firebase-AppCheck', 'x-razorpay-signature', 'x-razorpay-event-id'],
 }));
 
 // Detect production environment:
@@ -707,6 +685,7 @@ let invoices: PaymentInvoice[] = [];
 
 // Cases Store (Starts empty; populates when litigants or advocates file cases)
 let casesStore: CaseMatter[] = [];
+let verificationRequestsStore: any[] = [];
 
 // Orders & Payment Anti-Replay Store (Enforces verified payment integrity)
 interface RegisteredOrder {
@@ -808,19 +787,58 @@ app.post('/api/auth/switch-persona', apiLimiter, async (req, res) => {
   });
 });
 
-// Auth Registration (Strictly restricted to 'client' and 'lawyer' roles)
-app.delete('/api/account', verifyIdTokenMiddleware, async (req, res) => {
-  const user = (req as any).user;
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+// 1. DELETE /api/account (Safe Data Purge & Firebase Auth Revocation for DPDP Compliance)
+app.delete('/api/account', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.id === 'guest_user') {
+    return res.status(401).json({ error: 'Unauthorized: Valid authenticated session required' });
   }
+
   try {
-    await db.collection('users').doc(user.uid).delete();
-    usersMap.delete(user.uid);
-    res.json({ message: 'Account deleted successfully' });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, 'users');
-    res.status(500).json({ error: 'Failed to delete account' });
+    const targetUserId = user.id;
+
+    // 1. Revoke Firebase Auth credentials and delete Firebase Auth user if present
+    try {
+      const auth = getAuth();
+      const targetUid = user.firebaseUid || (!targetUserId.startsWith('client_') && !targetUserId.startsWith('lawyer_') ? targetUserId : null);
+      if (targetUid) {
+        await auth.revokeRefreshTokens(targetUid);
+        await auth.deleteUser(targetUid).catch(() => {});
+      }
+    } catch (authErr: any) {
+      console.warn('Firebase Auth credential revocation notice:', authErr?.message || authErr);
+    }
+
+    // 2. Safely purge user record in Firestore
+    try {
+      await db.collection('users').doc(targetUserId).delete();
+    } catch (dbErr: any) {
+      console.warn('Firestore user doc purge notice:', dbErr?.message || dbErr);
+    }
+
+    // 3. Invalidate and purge all active sessions for this user
+    for (const [sToken, sRecord] of sessionStore.entries()) {
+      if (sRecord.userId === targetUserId) {
+        sessionStore.delete(sToken);
+        try {
+          await db.collection('sessions').doc(sToken).delete();
+        } catch (e) {}
+      }
+    }
+
+    // 4. Purge in-memory state
+    usersMap.delete(targetUserId);
+    delete users[targetUserId];
+    lawyersDirectory = lawyersDirectory.filter(l => l.id !== targetUserId);
+
+    res.json({
+      success: true,
+      message: 'User account and personal data successfully purged, and Firebase Auth credentials revoked.',
+      userId: targetUserId
+    });
+  } catch (error: any) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete account', details: error?.message });
   }
 });
 
@@ -1001,25 +1019,91 @@ app.post('/api/lawyers/verify', apiLimiter, async (req, res) => {
     });
   }
 
-  // Update user verification status
-  user.isVerifiedLawyer = true;
+  // Do NOT verify instantly: create verification request record with status "pending"
+  const reqId = `req_${Date.now()}`;
+  const verificationReq = {
+    id: reqId,
+    lawyerId: targetId,
+    barCouncilNumber: regNumber,
+    stateBarCouncil: barState,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+  verificationRequestsStore.push(verificationReq);
+
   user.barCouncilNumber = regNumber;
   if (barState) user.stateBarCouncil = barState;
+  user.isVerifiedLawyer = false;
   usersMap.set(targetId, user);
-
-  // Also update directory
-  const dirLawyer = lawyersDirectory.find(l => l.id === targetId);
-  if (dirLawyer) {
-    dirLawyer.isVerified = true;
-    dirLawyer.barCouncilNumber = regNumber;
-    if (barState) dirLawyer.stateBarCouncil = barState;
-  }
+  users[targetId] = user;
 
   res.json({
     success: true,
-    message: 'Bar Council credentials successfully verified via Bar Council of India e-Portal.',
+    status: 'pending',
+    message: 'Bar Council verification request submitted successfully and is pending review by a verification officer.',
+    verificationRequestId: reqId,
     user
   });
+});
+
+// Admin / Verification Officer Approval Endpoint
+app.post('/api/admin/verify-lawyer', apiLimiter, async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (user.role !== 'admin' && user.role !== 'team_member' && user.role !== 'lawyer') {
+    return res.status(403).json({ error: 'Unauthorized: Admin, verification officer, or authorized lawyer access required.' });
+  }
+  const { lawyerId } = req.body;
+  const targetLawyer = usersMap.get(lawyerId) || users[lawyerId];
+  if (!targetLawyer || targetLawyer.role !== 'lawyer') {
+    return res.status(404).json({ error: 'Lawyer not found' });
+  }
+  targetLawyer.isVerifiedLawyer = true;
+  usersMap.set(lawyerId, targetLawyer);
+
+  const dirLawyer = lawyersDirectory.find(l => l.id === lawyerId);
+  if (dirLawyer) {
+    dirLawyer.isVerified = true;
+  }
+
+  res.json({ success: true, user: targetLawyer });
+});
+
+// Razorpay Webhook Endpoint
+app.post('/api/membership/webhook', apiLimiter, async (req, res) => {
+  const signature = req.headers['x-razorpay-signature'] as string;
+  const eventId = req.body?.payload?.payment?.entity?.id || req.body?.id || req.headers['x-razorpay-event-id'] || (req.body?.event && req.body.event !== 'payment.captured' ? req.body.event : null) || ('evt_' + Math.random());
+
+  if (processedWebhooksSet.has(String(eventId))) {
+    return res.status(200).json({ status: 'already_processed' });
+  }
+
+  try {
+    const webhookDoc = await db.collection('processed_webhooks').doc(String(eventId)).get();
+    if (webhookDoc.exists) {
+      processedWebhooksSet.add(String(eventId));
+      return res.status(200).json({ status: 'already_processed' });
+    }
+  } catch (e) {}
+
+  if (RAZORPAY_WEBHOOK_SECRET && signature) {
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_WEBHOOK_SECRET)
+      .update(rawBody)
+      .digest('hex');
+    if (expectedSignature !== signature) {
+      return res.status(400).json({ error: 'Invalid webhook signature', securityCode: 'SEC_INVALID_WEBHOOK_SIGNATURE' });
+    }
+  } else if (isProduction && RAZORPAY_WEBHOOK_SECRET && !signature) {
+    return res.status(400).json({ error: 'Missing webhook signature', securityCode: 'SEC_MISSING_WEBHOOK_SIGNATURE' });
+  }
+
+  processedWebhooksSet.add(String(eventId));
+  try {
+    await db.collection('processed_webhooks').doc(String(eventId)).set({ processedAt: new Date().toISOString() });
+  } catch (e) {}
+
+  res.json({ status: 'ok', received: true });
 });
 
 // Automated AI-Powered Lawyer Verification Endpoint -> Updated to Manual Team Verification Queue

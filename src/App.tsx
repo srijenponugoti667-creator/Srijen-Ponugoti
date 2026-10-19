@@ -89,6 +89,9 @@ export default function App() {
         throw new Error(`Expected JSON response, received ${contentType}`);
       }
       const data = await res.json();
+      if (data && data.sessionToken) {
+        localStorage.setItem('jb_sess_token', data.sessionToken);
+      }
       if (data && data.user) {
         setCurrentUser(data.user);
       }
@@ -128,12 +131,41 @@ export default function App() {
         body: JSON.stringify({ userId }),
       });
       const data = await res.json();
+      if (data.sessionToken) {
+        localStorage.setItem('jb_sess_token', data.sessionToken);
+      }
       if (data.user) {
         setCurrentUser(data.user);
         showToast(`Switched active persona to ${data.user.name} (${data.user?.role === 'lawyer' ? (data.user?.isVerifiedLawyer ? 'Verified Advocate' : 'Unverified Lawyer') : 'Client'})`);
       }
     } catch (err) {
       console.error('Failed to switch persona:', err);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete your JusticeBridge account? Under Digital Personal Data Protection (DPDP) Act compliance, all your uploaded documents, personal profile, case history, and Firebase Auth credentials will be permanently purged.")) {
+      return;
+    }
+    try {
+      const token = localStorage.getItem('jb_sess_token') || '';
+      const res = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        localStorage.removeItem('jb_sess_token');
+        showToast('Account and all personal data permanently purged in compliance with DPDP data deletion requirements.');
+        await fetchCurrentUser();
+      } else {
+        showToast(`Deletion failed: ${data.error || 'Server error'}`);
+      }
+    } catch (e: any) {
+      showToast(`Error deleting account: ${e.message}`);
     }
   };
 
@@ -176,6 +208,7 @@ export default function App() {
             onOpenVoiceCaseFilerModal={() => setIsVoiceFilerModalOpen(true)}
             currentLanguage={currentLanguage}
             onLanguageChange={handleLanguageChange}
+            onDeleteAccount={handleDeleteAccount}
           />
 
           {/* 2. Membership Notification Banner */}

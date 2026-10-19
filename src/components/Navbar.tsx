@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scale, ShieldCheck, AlertTriangle, UserCheck, RefreshCw, Crown, Search, Briefcase, FileText, BarChart3, ChevronDown, CheckCircle2, Calendar, UserPlus, Edit3, Globe, Mic, Sparkles, Award } from 'lucide-react';
+import { Scale, ShieldCheck, AlertTriangle, UserCheck, RefreshCw, Crown, Search, Briefcase, FileText, BarChart3, ChevronDown, CheckCircle2, Calendar, UserPlus, Edit3, Globe, Mic, Sparkles, Award, Trash2 } from 'lucide-react';
 import appLogo from '../assets/images/justicebridge_app_logo_1788288183801.jpg';
 import { User } from '../types';
 import { INDIAN_LANGUAGES, LanguageOption, getTranslation } from '../languages';
@@ -19,6 +19,7 @@ interface NavbarProps {
   onOpenVoiceCaseFilerModal?: () => void;
   currentLanguage?: string;
   onLanguageChange?: (langCode: string) => void;
+  onDeleteAccount?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -34,7 +35,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProfileEditorModal,
   onOpenVoiceCaseFilerModal,
   currentLanguage = 'te',
-  onLanguageChange
+  onLanguageChange,
+  onDeleteAccount
 }) => {
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -406,6 +408,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <UserPlus className="w-3.5 h-3.5" />
                       <span>Switch / Register New Account</span>
                     </button>
+
+                    {onDeleteAccount && currentUser?.id !== 'guest_user' && (
+                      <button
+                        id="btn-delete-account-dpdp"
+                        onClick={() => {
+                          setShowPersonaMenu(false);
+                          onDeleteAccount();
+                        }}
+                        className="w-full flex items-center justify-center space-x-1.5 py-1.5 mt-2 rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200 text-xs font-semibold transition-all cursor-pointer"
+                        title="Irreversibly delete account and purge all personal data under DPDP Act"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        <span>Delete Account (DPDP Purge)</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

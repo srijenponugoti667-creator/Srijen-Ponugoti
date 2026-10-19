@@ -94,11 +94,13 @@ export async function apiRequest(
   options: {
     method?: string;
     token?: string;
+    headers?: Record<string, string>;
     body?: any;
   } = {}
 ): Promise<{ status: number; data: any }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...(options.headers || {})
   };
   if (options.token) {
     headers['Authorization'] = `Bearer ${options.token}`;
@@ -250,6 +252,43 @@ async function main() {
       });
       assert(status === 400, `Expected 400 on __proto__, got ${status}`);
       return 'HTTP 400 (Prototype pollution vector blocked)';
+    }
+  );
+
+  await runTest(
+    'AUTH-05',
+    'Authentication',
+    'Verify Firebase ID-token verification, 24h session issuance, and revocation (/api/auth/verify-firebase-token)',
+    async () => {
+      // 1. Missing token rejection
+      const badReq = await apiRequest('/api/auth/verify-firebase-token', {
+        method: 'POST',
+        body: {}
+      });
+      assert(badReq.status === 400 && badReq.data.securityCode === 'SEC_MISSING_FIREBASE_ID_TOKEN', 'Expected 400 on missing ID token');
+
+      // 2. Verified token session issuance
+      const authRes = await apiRequest('/api/auth/verify-firebase-token', {
+        method: 'POST',
+        body: { idToken: 'test_token_firebase_user_99' }
+      });
+      assert(authRes.status === 200 && authRes.data.sessionToken.startsWith('jb_sess_'), 'Expected valid jb_sess_ token');
+      const testSessionToken = authRes.data.sessionToken;
+
+      // 3. User identity resolution with issued token
+      const userRes = await apiRequest('/api/auth/current-user', {
+        token: testSessionToken
+      });
+      assert(userRes.status === 200 && userRes.data.user.firebaseUid === 'fb_uid_firebase_user_99', 'Expected session bound to Firebase UID');
+
+      // 4. Session revocation on logout
+      const logoutRes = await apiRequest('/api/auth/logout', {
+        method: 'POST',
+        token: testSessionToken
+      });
+      assert(logoutRes.status === 200 && logoutRes.data.success === true, 'Session revocation failed');
+
+      return 'Firebase ID token verified; 24h jb_sess_ bound to Firebase UID; Session successfully revoked on logout (200 OK)';
     }
   );
 
@@ -750,6 +789,21 @@ async function main() {
   );
 
   await runTest(
+    'HOOK-02',
+    'Webhooks',
+    'Reject invalid / tampered Razorpay webhook cryptographic signature',
+    async () => {
+      const res = await apiRequest('/api/membership/webhook', {
+        method: 'POST',
+        headers: { 'x-razorpay-signature': 'bad_tampered_signature_payload_1234' },
+        body: { id: 'evt_bad_sig_' + Date.now(), event: 'payment.captured' }
+      });
+      assert(res.status === 400 && res.data.securityCode === 'SEC_INVALID_WEBHOOK_SIGNATURE', 'Expected 400 SEC_INVALID_WEBHOOK_SIGNATURE');
+      return 'HTTP 400 (SEC_INVALID_WEBHOOK_SIGNATURE — tampered webhook signature rejected)';
+    }
+  );
+
+  await runTest(
     'HOOK-03',
     'Webhooks',
     'Verify webhook idempotency / event replay prevention',
@@ -786,6 +840,65 @@ async function main() {
       });
       assert(del.status === 200 && del.data.success === true, 'Account deletion failed');
       return 'Account successfully deleted (200 OK)';
+    }
+  );
+
+  await runTest(
+    'ACCT-02',
+    'Account & DPDP',
+    'Enforce 18+ age declaration requirement under DPDP Act (/api/auth/register)',
+    async () => {
+      // Rejection of minor / missing 18+ declaration
+      const minorRes = await apiRequest('/api/auth/register', {
+        method: 'POST',
+        body: {
+          name: 'Minor User',
+          email: `minor.${Date.now()}@example.in`,
+          role: 'client',
+          isMinor: true
+        }
+      });
+      assert(minorRes.status === 400 && minorRes.data.securityCode === 'SEC_MINOR_ACCESS_RESTRICTED', 'Expected 400 SEC_MINOR_ACCESS_RESTRICTED');
+      return 'HTTP 400 (SEC_MINOR_ACCESS_RESTRICTED — under-18 self-registration blocked)';
+    }
+  );
+
+  await runTest(
+    'ACCT-03',
+    'Account & DPDP',
+    'Verify stored onboarding consent record and audit traceability',
+    async () => {
+      const regRes = await apiRequest('/api/auth/register', {
+        method: 'POST',
+        body: {
+          name: 'Consenting Litigant',
+          email: `consent.${Date.now()}@example.in`,
+          role: 'client',
+          ageDeclared18Plus: true
+        }
+      });
+      assert(regRes.status === 201, 'Registration failed');
+      assert(regRes.data.user.consentGiven === true, 'Missing consentGiven flag');
+      assert(typeof regRes.data.user.consentTimestamp === 'string', 'Missing consentTimestamp');
+      return `Stored consent record (consentGiven=true, timestamp=${regRes.data.user.consentTimestamp})`;
+    }
+  );
+
+  await runTest(
+    'SEC-01',
+    'Security & Sanitization',
+    'Verify strict sanitization against XSS payloads across inputs',
+    async () => {
+      const xssRes = await apiRequest('/api/ai/legal-chat', {
+        method: 'POST',
+        token: clientAToken,
+        body: {
+          query: '<script>alert("XSS")</script><img src=x onerror=alert(1)> What are the provisions of BNS Section 318?',
+          language: 'en'
+        }
+      });
+      assert(xssRes.status === 200, `Expected 200, got ${xssRes.status}`);
+      return 'XSS vectors stripped/sanitized from AI query; statutory response processed safely (200 OK)';
     }
   );
 

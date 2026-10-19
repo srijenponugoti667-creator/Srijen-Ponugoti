@@ -50,8 +50,13 @@ app.set('trust proxy', 1);
 
 // Secure headers with Helmet configured for iframe embedding & Vite development
 app.use(helmet({
-  contentSecurityPolicy: false,
-  frameguard: false, // Essential: allows Google AI Studio preview iframe to embed the app
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "frame-ancestors": ["'self'"],
+    },
+  },
+  frameguard: { action: 'sameorigin' },
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
   crossOriginOpenerPolicy: false,

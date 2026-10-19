@@ -10,6 +10,8 @@ import {
   ALLOWED_CASE_DOCUMENT_MIMES,
   MAX_CASE_DOCUMENT_BYTES,
 } from '../services/evidenceHasher';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface CaseFileViewerModalProps {
   caseId: string | null;
@@ -135,6 +137,59 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
     });
   };
 
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(127, 29, 29); // Deep red
+      doc.text('JUSTICEBRIDGE OFFICIAL CASE RECORD', 14, 20);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${new Date().toLocaleString()} | Case Reference: ${caseNumber || caseId}`, 14, 27);
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, 32, 196, 32);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(30, 30, 30);
+      doc.text('Litigation Summary & Vault Documents', 14, 42);
+
+      const tableData = documents.map((d, index) => [
+        index + 1,
+        d.title,
+        d.fileCategory,
+        d.uploadedBy,
+        d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : 'N/A',
+        d.documentHash ? d.documentHash.substring(0, 22) + '...' : 'N/A'
+      ]);
+
+      autoTable(doc, {
+        startY: 48,
+        head: [['#', 'Document Title', 'Category', 'Uploaded By', 'Date', 'SHA-256 Hash Digest']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [127, 29, 29], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 4 },
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY || 100;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text('Evidentiary chain-of-custody secured under FIPS 180-4 SHA-256 standard (Sec 63 BSA 2023).', 14, finalY + 15);
+      doc.text('JusticeBridge Legal Technologies — Confidential Judicial Vault Record', 14, finalY + 21);
+
+      doc.save(`JusticeBridge_Case_${caseNumber ? caseNumber.replace(/\//g, '_') : 'Record'}.pdf`);
+      logSecurityActivity('FILE_ACCESS', `Exported case record PDF for case ${caseNumber || caseId}`);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+    }
+  };
+
   const handleVerifyHashIntegrity = async () => {
     if (!selectedDoc || !caseId) return;
     try {
@@ -254,12 +309,24 @@ export const CaseFileViewerModal: React.FC<CaseFileViewerModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-3">
+            {authorized && (
+              <button
+                onClick={handleExportPDF}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-red-800 hover:bg-red-700 text-white text-xs font-bold shadow transition-colors cursor-pointer"
+                title="Download formatted PDF record for offline records"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export PDF</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}

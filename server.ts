@@ -643,21 +643,25 @@ async function getAuthenticatedUser(req?: express.Request): Promise<User> {
     }
 
     if (token) {
-      // Always fetch session from Firestore as source of truth
-      try {
-        const sessionDoc = await db.collection('sessions').doc(token).get();
-        if (sessionDoc.exists) {
-          const session = sessionDoc.data() as SessionRecord;
-          sessionStore.set(token, session);
-          if (session.expiresAt > Date.now()) {
-            const foundUser = usersMap.get(session.userId);
-            if (foundUser) {
-              return ensureUserTrial(foundUser);
-            }
+      // Check in-memory resilient session cache first
+      let session = sessionStore.get(token);
+      if (!session) {
+        try {
+          const sessionDoc = await db.collection('sessions').doc(token).get();
+          if (sessionDoc.exists) {
+            session = sessionDoc.data() as SessionRecord;
+            sessionStore.set(token, session);
           }
+        } catch (err) {
+          console.warn('Firestore session verification error:', err);
         }
-      } catch (err) {
-        console.warn('Firestore session verification error:', err);
+      }
+
+      if (session && session.expiresAt > Date.now()) {
+        const foundUser = usersMap.get(session.userId) || (Object.prototype.hasOwnProperty.call(users, session.userId) ? users[session.userId] : undefined);
+        if (foundUser) {
+          return ensureUserTrial(foundUser);
+        }
       }
     }
   }

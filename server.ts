@@ -1153,7 +1153,10 @@ app.post('/api/admin/verify-lawyer', apiLimiter, async (req, res) => {
     return res.status(403).json({ error: 'Unauthorized: Admin, verification officer, or authorized lawyer access required.' });
   }
   const { lawyerId } = req.body;
-  const targetLawyer = usersMap.get(lawyerId) || users[lawyerId];
+  if (!isSafeIdentifier(lawyerId)) {
+    return res.status(400).json({ error: 'Invalid lawyerId' });
+  }
+  const targetLawyer = usersMap.get(lawyerId);
   if (!targetLawyer || targetLawyer.role !== 'lawyer') {
     return res.status(404).json({ error: 'Lawyer not found' });
   }
@@ -3283,7 +3286,7 @@ app.post('/api/webhooks/razorpay', apiLimiter, async (req, res) => {
     processedWebhooksSet.add(event.id);
 
     // Update user membership in memory cache
-    if (userId && usersMap.has(userId)) {
+    if (userId && isSafeIdentifier(userId) && usersMap.has(userId)) {
       const u = usersMap.get(userId);
       if (u) {
         u.membershipActive = true;
